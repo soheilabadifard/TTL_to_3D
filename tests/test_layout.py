@@ -50,3 +50,19 @@ def test_stress_positions_handle_no_links_and_a_single_node():
     assert set(layout.stress_positions(["x", "y", "z"], [])) == {"x", "y", "z"}
     only = layout.stress_positions(["only"], [])
     assert set(only) == {"only"} and len(only["only"]) == 3
+
+
+def test_stress_positions_with_no_nodes_returns_nothing():
+    assert layout.stress_positions([], []) == {}
+
+
+def test_stress_positions_survive_a_lone_self_loop():
+    pos = layout.stress_positions(["a"], [{"source": "a", "target": "a"}])
+    assert pos == {"a": [0.0, 0.0, 0.0]}
+
+
+def test_stress_positions_are_reproducible():
+    ids = [f"n{i}" for i in range(12)]
+    links = [{"source": f"n{i}", "target": f"n{i + 1}"} for i in range(11)]
+    links.append({"source": "n0", "target": "n6"})
+    assert layout.stress_positions(ids, links) == layout.stress_positions(ids, links)

@@ -15,6 +15,8 @@ LABEL_MAX_LINKS = 800
 LAYOUT_MODES = ("auto", "stress", "force")
 LABEL_MODES = ("auto", "always", "hover")
 
+SEED = 0   # networkx seeds 3-D Kamada-Kawai from a random layout; fix it so a rebuild keeps the picture
+
 
 def choose_layout(n_nodes: int, mode: str = "auto") -> str:
     if mode not in LAYOUT_MODES:
@@ -34,23 +36,31 @@ def choose_labels(n_nodes: int, n_links: int, mode: str = "auto") -> dict:
     return {"node": n_nodes <= LABEL_MAX_NODES, "edge": n_links <= LABEL_MAX_LINKS}
 
 
+def _kk(G) -> dict:
+    """3-D Kamada-Kawai positions for one connected graph, seeded so the same
+    input always gives the same picture. A single node sits at the origin."""
+    import networkx as nx
+    if G.number_of_nodes() == 1:
+        return {next(iter(G)): [0.0, 0.0, 0.0]}
+    return nx.kamada_kawai_layout(G, dim=3, pos=nx.random_layout(G, dim=3, seed=SEED))
+
+
 def stress_positions(node_ids: list[str], links: list[dict]) -> dict[str, list[float]]:
     """3D Kamada-Kawai positions for the largest component, scaled so the mean
     edge length lands near the live rest length (~60); smaller components are
     parked on a grid beyond the main body."""
     import networkx as nx
+    if not node_ids:
+        return {}
     H = nx.Graph()
     H.add_nodes_from(node_ids)
-    H.add_edges_from((l["source"], l["target"]) for l in links)
+    H.add_edges_from((l["source"], l["target"]) for l in links if l["source"] != l["target"])
     comps = sorted(nx.connected_components(H), key=lambda c: (-len(c), sorted(c)[0]))
     pos: dict[str, list[float]] = {}
     main = comps[0]
-    if len(main) == 1:
-        p = {next(iter(main)): [0.0, 0.0, 0.0]}
-    else:
-        p = nx.kamada_kawai_layout(H.subgraph(main), dim=3)
-    lens = [math.dist(p[l["source"]], p[l["target"]])
-            for l in links if l["source"] in p and l["target"] in p]
+    p = _kk(H.subgraph(main))
+    lens = [d for d in (math.dist(p[l["source"]], p[l["target"]])
+                        for l in links if l["source"] in p and l["target"] in p) if d > 0]
     scale = 60 / (sum(lens) / len(lens)) if lens else 60
     for n, xyz in p.items():
         pos[n] = [round(float(c) * scale, 2) for c in xyz]
