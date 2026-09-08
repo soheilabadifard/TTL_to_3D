@@ -1,0 +1,26 @@
+# Second file for the ttl3d demo: robotic missions and the bodies they visited.
+# This file owns the "visited" edges into bodies declared in solar-system.ttl,
+# so coloring by file shows which file asserts what.
+@prefix :     <https://example.org/solar#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+:Mission a owl:Class ; rdfs:label "mission" ;
+    skos:definition "A robotic spacecraft mission to one or more bodies." .
+:visited    a owl:ObjectProperty ; rdfs:label "visited" ; rdfs:domain :Mission ; rdfs:range :CelestialBody .
+:launchYear a owl:DatatypeProperty ; rdfs:label "launch year" ; rdfs:range xsd:gYear .
+
+:Voyager2    a :Mission ; rdfs:label "Voyager 2"    ; :launchYear "1977"^^xsd:gYear ;
+    :visited :Jupiter, :Saturn, :Uranus, :Neptune .
+:Galileo     a :Mission ; rdfs:label "Galileo"      ; :launchYear "1989"^^xsd:gYear ;
+    :visited :Jupiter, :Io, :Europa, :Ganymede, :Callisto .
+:Cassini     a :Mission ; rdfs:label "Cassini"      ; :launchYear "1997"^^xsd:gYear ;
+    :visited :Saturn, :Titan, :Enceladus .
+:NewHorizons a :Mission ; rdfs:label "New Horizons" ; :launchYear "2006"^^xsd:gYear ;
+    :visited :Pluto, :Charon .
+:Juno        a :Mission ; rdfs:label "Juno"         ; :launchYear "2011"^^xsd:gYear ;
+    :visited :Jupiter .
+:Dawn        a :Mission ; rdfs:label "Dawn"         ; :launchYear "2007"^^xsd:gYear ;
+    :visited :Ceres .

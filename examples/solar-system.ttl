@@ -1,0 +1,68 @@
+# ttl3d demo ontology: a small, original model of the Solar System.
+# Public facts only (radii rounded from NASA fact sheets); no project content.
+@prefix :        <https://example.org/solar#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://example.org/solar> a owl:Ontology ; rdfs:label "Solar System demo" .
+
+# --- classes -------------------------------------------------------------
+:CelestialBody a owl:Class ; rdfs:label "celestial body" ;
+    skos:definition "A natural object in space bound by gravity." .
+:Star        a owl:Class ; rdfs:subClassOf :CelestialBody ; rdfs:label "star" ;
+    skos:definition "A luminous sphere of plasma held together by its own gravity." .
+:Planet      a owl:Class ; rdfs:subClassOf :CelestialBody ; rdfs:label "planet" ;
+    skos:definition "A body orbiting a star that has cleared its orbital neighbourhood." .
+:DwarfPlanet a owl:Class ; rdfs:subClassOf :CelestialBody ; rdfs:label "dwarf planet" ;
+    skos:definition "A body orbiting a star in hydrostatic equilibrium that has not cleared its orbit." .
+:Moon        a owl:Class ; rdfs:subClassOf :CelestialBody ; rdfs:label "moon" ;
+    skos:definition "A natural satellite of a planet or dwarf planet." .
+
+# --- properties ----------------------------------------------------------
+:orbits   a owl:ObjectProperty ; rdfs:label "orbits" ;
+    rdfs:domain :CelestialBody ; rdfs:range :CelestialBody .
+:hasMoon  a owl:ObjectProperty ; rdfs:label "has moon" ; owl:inverseOf :orbits ;
+    rdfs:domain :CelestialBody ; rdfs:range :Moon .
+:radiusKm a owl:DatatypeProperty ; rdfs:label "mean radius (km)" ; rdfs:range xsd:decimal .
+
+# --- the star ------------------------------------------------------------
+:Sun a :Star ; rdfs:label "Sun" ; skos:altLabel "Sol" ; :radiusKm 695700 ;
+    dcterms:source :NasaFactSheets .
+
+# --- planets -------------------------------------------------------------
+:Mercury a :Planet ; rdfs:label "Mercury" ; :orbits :Sun ; :radiusKm 2440 .
+:Venus   a :Planet ; rdfs:label "Venus"   ; :orbits :Sun ; :radiusKm 6052 .
+:Earth   a :Planet ; rdfs:label "Earth"   ; skos:altLabel "Terra" ; :orbits :Sun ; :radiusKm 6371 ;
+    :hasMoon :Luna ; dcterms:source :NasaFactSheets .
+:Mars    a :Planet ; rdfs:label "Mars"    ; :orbits :Sun ; :radiusKm 3390 ; :hasMoon :Phobos, :Deimos .
+:Jupiter a :Planet ; rdfs:label "Jupiter" ; :orbits :Sun ; :radiusKm 69911 ;
+    :hasMoon :Io, :Europa, :Ganymede, :Callisto .
+:Saturn  a :Planet ; rdfs:label "Saturn"  ; :orbits :Sun ; :radiusKm 58232 ; :hasMoon :Titan, :Enceladus .
+:Uranus  a :Planet ; rdfs:label "Uranus"  ; :orbits :Sun ; :radiusKm 25362 ; :hasMoon :Titania .
+:Neptune a :Planet ; rdfs:label "Neptune" ; :orbits :Sun ; :radiusKm 24622 ; :hasMoon :Triton .
+
+# --- dwarf planets -------------------------------------------------------
+:Pluto a :DwarfPlanet ; rdfs:label "Pluto" ; :orbits :Sun ; :radiusKm 1188 ; :hasMoon :Charon .
+:Ceres a :DwarfPlanet ; rdfs:label "Ceres" ; :orbits :Sun ; :radiusKm 470 .
+
+# --- moons ---------------------------------------------------------------
+:Luna      a :Moon ; rdfs:label "Moon" ; skos:altLabel "Luna" ; :orbits :Earth ; :radiusKm 1737 .
+:Phobos    a :Moon ; rdfs:label "Phobos"    ; :orbits :Mars    ; :radiusKm 11 .
+:Deimos    a :Moon ; rdfs:label "Deimos"    ; :orbits :Mars    ; :radiusKm 6 .
+:Io        a :Moon ; rdfs:label "Io"        ; :orbits :Jupiter ; :radiusKm 1822 .
+:Europa    a :Moon ; rdfs:label "Europa"    ; :orbits :Jupiter ; :radiusKm 1561 .
+:Ganymede  a :Moon ; rdfs:label "Ganymede"  ; :orbits :Jupiter ; :radiusKm 2634 .
+:Callisto  a :Moon ; rdfs:label "Callisto"  ; :orbits :Jupiter ; :radiusKm 2410 .
+:Titan     a :Moon ; rdfs:label "Titan"     ; :orbits :Saturn  ; :radiusKm 2575 .
+:Enceladus a :Moon ; rdfs:label "Enceladus" ; :orbits :Saturn  ; :radiusKm 252 .
+:Titania   a :Moon ; rdfs:label "Titania"   ; :orbits :Uranus  ; :radiusKm 789 .
+:Triton    a :Moon ; rdfs:label "Triton"    ; :orbits :Neptune ; :radiusKm 1353 .
+:Charon    a :Moon ; rdfs:label "Charon"    ; :orbits :Pluto   ; :radiusKm 606 .
+
+# --- a source document (shows up on the card, not in the graph) ---------
+:NasaFactSheets rdfs:label "NASA planetary fact sheets" ;
+    dcterms:identifier "https://nssdc.gsfc.nasa.gov/planetary/factsheet/" .

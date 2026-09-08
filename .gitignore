@@ -1,0 +1,24 @@
+# working notes and tooling state
+ai-notes/
+.claude/
+.superpowers/
+*.plan.md
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# generated viewers
+out/
+*.html
+!tests/fixtures/*.html
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/
+.gstack/

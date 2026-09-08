@@ -1,0 +1,11 @@
+@prefix ex:   <http://example.org/library#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# an edge between two nodes both declared in library.ttl: this file owns the
+# edge, not the nodes
+ex:Dune ex:relatedTo ex:Prefonly .
+# a repeated declaration must not steal the node from library.ttl
+ex:Dune rdfs:label "Dune" .
+# nodes declared here
+ex:Asimov     a ex:Author ; rdfs:label "Isaac Asimov" ; ex:wrote ex:Foundation .
+ex:Foundation a ex:Book ; rdfs:label "Foundation" .

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ttl3d"
+version = "0.1.0"
+description = "Turn any Turtle / RDF graph into a self-contained, offline 3D HTML viewer"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Soheil Abadifard"}]
+requires-python = ">=3.10"
+dependencies = ["rdflib>=7", "networkx>=3", "numpy", "scipy"]
+keywords = ["rdf", "turtle", "owl", "ontology", "knowledge-graph", "semantic-web",
+            "linked-data", "visualization", "3d", "graph-visualization"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+[project.urls]
+Repository = "https://github.com/soheilabadifard/TTL_to_3D"
+Issues = "https://github.com/soheilabadifard/TTL_to_3D/issues"
+
+[project.scripts]
+ttl3d = "ttl3d.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ttl3d*"]
+
+[tool.setuptools.package-data]
+ttl3d = ["vendor/*.js", "vendor/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
