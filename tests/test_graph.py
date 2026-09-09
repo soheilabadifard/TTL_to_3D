@@ -252,3 +252,24 @@ def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(l
     with pytest.raises(ValueError) as e:
         graph.resolve_terms(["urn:isbn:0451450523"], ds)
     assert "<urn:isbn:0451450523>" in str(e.value)
+
+
+def test_iri_valued_attribute_predicates_show_on_the_card(tmp_path):
+    ttl = tmp_path / "iri.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/c#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                   'ex:onto rdfs:label "The onto" .\n'
+                   "ex:a rdfs:isDefinedBy ex:onto ; owl:priorVersion <http://example.org/c/v1> ; ex:p ex:b .\n",
+                   encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["props"] == {"isDefinedBy": ["The onto"], "priorVersion": ["http://example.org/c/v1"]}
+    assert [l["predicates"] for l in build(ttl)["links"]] == [["p"]]
+
+
+def test_a_link_asserted_by_two_files_lists_both(tmp_path):
+    for name in ("first", "second"):
+        (tmp_path / f"{name}.ttl").write_text(
+            "@prefix ex: <http://example.org/f#> .\nex:a ex:p ex:b .\n", encoding="utf-8")
+    data = build(tmp_path / "first.ttl", tmp_path / "second.ttl")
+    assert data["links"][0]["files"] == ["first", "second"] and data["links"][0]["group"] == "first"

@@ -169,3 +169,8 @@ def test_viewer_labels_bidirectional_links_with_both_predicates():
     js = render.VIEWER_JS.read_text(encoding="utf-8")
     assert "const linkText = " in js and "⇄" in js
     assert "l.reverse.length ? 0 : 4.5" in js
+
+
+def test_viewer_shows_asserting_files_on_relation_rows():
+    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    assert "files:l.files" in js and "r.files.join(', ')" in js

@@ -17,12 +17,12 @@ DATA.links.forEach(l => {
   (nbr[l.source] ??= new Set()).add(l.target);
   (nbr[l.target] ??= new Set()).add(l.source);
   if (l.predicates.length) {
-    (rels[l.source] ??= []).push({dir:'out', pred:l.predicates.join(', '), other:l.target});
-    (rels[l.target] ??= []).push({dir:'in',  pred:l.predicates.join(', '), other:l.source});
+    (rels[l.source] ??= []).push({dir:'out', pred:l.predicates.join(', '), other:l.target, files:l.files});
+    (rels[l.target] ??= []).push({dir:'in',  pred:l.predicates.join(', '), other:l.source, files:l.files});
   }
   if (l.reverse.length) {
-    (rels[l.target] ??= []).push({dir:'out', pred:l.reverse.join(', '), other:l.source});
-    (rels[l.source] ??= []).push({dir:'in',  pred:l.reverse.join(', '), other:l.target});
+    (rels[l.target] ??= []).push({dir:'out', pred:l.reverse.join(', '), other:l.source, files:l.files});
+    (rels[l.source] ??= []).push({dir:'in',  pred:l.reverse.join(', '), other:l.target, files:l.files});
   }
 });
 // a link asserted both ways carries both predicate lists and no arrowhead
@@ -138,12 +138,14 @@ function showNode(n) {
   }
   const rl = rels[n.id] || [];
   const out = rl.filter(r => r.dir === 'out'), inn = rl.filter(r => r.dir === 'in');
+  const manyFiles = new Set(DATA.nodes.map(n => n.file)).size > 1;
   const relRow = r => {
     const o = byId[r.other];
     const name = o ? esc(o.label) : esc(r.other);
+    const files = manyFiles && r.files.length ? ` <span class="pred">[${esc(r.files.join(', '))}]</span>` : '';
     return r.dir === 'out'
-      ? `<div class="rel" data-node="${esc(r.other)}"><span class="pred">${esc(r.pred)}</span> → <b>${name}</b></div>`
-      : `<div class="rel" data-node="${esc(r.other)}"><b>${name}</b> <span class="pred">${esc(r.pred)}</span> →</div>`;
+      ? `<div class="rel" data-node="${esc(r.other)}"><span class="pred">${esc(r.pred)}</span> → <b>${name}</b>${files}</div>`
+      : `<div class="rel" data-node="${esc(r.other)}"><b>${name}</b> <span class="pred">${esc(r.pred)}</span> →${files}</div>`;
   };
   if (out.length) h += `<h3>outgoing (${out.length})</h3>` + out.map(relRow).join('');
   if (inn.length) h += `<h3>incoming (${inn.length})</h3>` + inn.map(relRow).join('');

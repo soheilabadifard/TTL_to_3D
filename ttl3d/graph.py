@@ -152,11 +152,14 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
         def_pred = next((p for p in DEFINITION_PREDS if _literals(g, n, p, lang)), None)
         props = defaultdict(list)
         for _, p, o in g.triples((n, None, None)):
-            if not isinstance(o, Literal) or p in LABEL_PREDS or p == SKOS.altLabel:
-                continue
-            if p == def_pred and str(o) == definition:
-                continue
-            props[local(p)].append(str(o))
+            if isinstance(o, Literal):
+                if p in LABEL_PREDS or p == SKOS.altLabel:
+                    continue
+                if p == def_pred and str(o) == definition:
+                    continue
+                props[local(p)].append(str(o))
+            elif isinstance(o, URIRef) and p in attribute and p != RDF.type and p not in SOURCE_PREDS:
+                props[local(p)].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
         sources = sorted(
             ({"label": labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s),
