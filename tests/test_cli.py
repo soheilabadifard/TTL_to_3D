@@ -122,3 +122,15 @@ def test_cli_output_is_identical_across_processes(tmp_path):
         assert r.returncode == 0, r.stderr
         pages.append(out.read_bytes())
     assert pages[0] == pages[1]
+
+
+def test_cli_lang_picks_the_label_language(tmp_path):
+    ttl = tmp_path / "lang.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/l#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   'ex:z rdfs:label "Zebra"@en, "Antilope"@de ; ex:p ex:b .\n', encoding="utf-8")
+    out = tmp_path / "l.html"
+    cli.main([str(ttl), "-o", str(out)])
+    assert '"label": "Zebra"' in out.read_text(encoding="utf-8")
+    cli.main([str(ttl), "-o", str(out), "--lang", "de"])
+    assert '"label": "Antilope"' in out.read_text(encoding="utf-8")

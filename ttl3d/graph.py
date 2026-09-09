@@ -8,6 +8,15 @@ Parallel edges collapse into one link listing every predicate. Each node
 remembers the file that first declares it; each link remembers the file(s)
 asserting it, so a file that only adds edges between other files' nodes still
 owns something visible.
+
+A node's label is chosen by preference tier: the requested `--lang` language
+first, then untagged literals, then any other language, alphabetical within
+a tier; the same order picks the definition among skos:definition,
+rdfs:comment and dcterms:description. Label and altLabel values that lose
+that pick become synonyms in `alt`, and a definition-slot literal that loses
+its pick stays visible in the property table instead of vanishing. Literal
+`dcterms:source` / `prov:wasDerivedFrom` values land in the property table
+too; only IRI sources appear in the node's `sources` list.
 """
 from __future__ import annotations
 import re
@@ -23,7 +32,6 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
-_CARD_SLOTS = set(LABEL_PREDS) | set(DEFINITION_PREDS) | {SKOS.altLabel}
 
 
 def local(u) -> str:
@@ -35,15 +43,33 @@ def namespace_of(u) -> str:
     return s[:max(s.rfind("#"), s.rfind("/")) + 1]
 
 
-def _first(g, s, preds):
+def _literals(g, s, p, lang: str | None) -> list:
+    """Literal objects of (s, p): the requested language first, then untagged,
+    then any other language; alphabetical within a tier."""
+    def rank(o):
+        tag = (o.language or "").lower()
+        tier = 0 if lang and tag == lang.lower() else 1 if not tag else 2
+        return (tier, str(o))
+    return sorted((o for o in g.objects(s, p) if isinstance(o, Literal)), key=rank)
+
+
+def _first(g, s, preds, lang: str | None = None):
     for p in preds:
-        vals = sorted(str(o) for o in g.objects(s, p))
+        vals = _literals(g, s, p, lang)
         if vals:
-            return vals[0]
+            return str(vals[0])
     return None
 
 
-def build(ds: Dataset, color_by: str = "file") -> dict:
+def _prefix(ds: Dataset, ns: str) -> str:
+    """Prefix bound to a namespace; the empty default prefix shows as ':'.
+    Unbound namespaces fall back to the IRI base itself."""
+    if ns in ds.prefixes:
+        return ds.prefixes[ns] or ":"
+    return ns
+
+
+def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
     if color_by not in COLOR_KEYS:
         raise ValueError(f"color_by must be one of {COLOR_KEYS}, got {color_by!r}")
     g = ds.merged
@@ -80,7 +106,7 @@ def build(ds: Dataset, color_by: str = "file") -> dict:
 
     labels = {}
     for s in node_ids:
-        labels[s] = _first(g, s, LABEL_PREDS) or local(s)
+        labels[s] = _first(g, s, LABEL_PREDS, lang) or local(s)
     src_url = {s: str(o) for s, _, o in g.triples((None, DCTERMS.identifier, None))
                if str(o).startswith("http")}
 
@@ -89,29 +115,34 @@ def build(ds: Dataset, color_by: str = "file") -> dict:
             return node_file.get(n) or mention_file.get(n) or "?"
         if color_by == "type":
             return types[0] if types else "?"
-        ns = namespace_of(n)
-        return ds.prefixes.get(ns) or ns
+        return _prefix(ds, namespace_of(n))
 
     nodes = []
     for n in sorted(node_ids, key=str):
         types = sorted(local(t) for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
+        label_vals = [str(o) for p in LABEL_PREDS for o in _literals(g, n, p, lang)]
+        definition = _first(g, n, DEFINITION_PREDS, lang)
         props = defaultdict(list)
         for _, p, o in g.triples((n, None, None)):
-            if isinstance(o, Literal) and p not in _CARD_SLOTS:
-                props[local(p)].append(str(o))
+            if not isinstance(o, Literal) or p in LABEL_PREDS or p == SKOS.altLabel:
+                continue
+            if p in DEFINITION_PREDS and str(o) == definition:
+                continue
+            props[local(p)].append(str(o))
+        alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
         sources = sorted(
-            ({"label": labels.get(s) or _first(g, s, LABEL_PREDS) or local(s),
+            ({"label": labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s),
               "url": src_url.get(s)}
-             for p in SOURCE_PREDS for s in g.objects(n, p)),
+             for p in SOURCE_PREDS for s in g.objects(n, p) if isinstance(s, URIRef)),
             key=lambda d: d["label"])
         ns = namespace_of(n)
         nodes.append({
             "id": str(n), "label": labels[n], "types": types,
             "file": node_file.get(n) or mention_file.get(n) or "?",
-            "ns": ds.prefixes.get(ns) or ns,
+            "ns": _prefix(ds, ns),
             "group": group_of(n, types),
-            "definition": _first(g, n, DEFINITION_PREDS),
-            "alt": sorted(str(o) for o in g.objects(n, SKOS.altLabel)),
+            "definition": definition,
+            "alt": alt,
             "props": {k: sorted(v) for k, v in sorted(props.items())},
             "sources": sources,
         })

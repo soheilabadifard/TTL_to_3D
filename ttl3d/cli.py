@@ -22,6 +22,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"permanent labels (auto: nodes up to {layout.LABEL_MAX_NODES}, "
                         f"edges up to {layout.LABEL_MAX_LINKS}); hover = tooltips only")
     p.add_argument("--title", help="page title (default: first file stem)")
+    p.add_argument("--lang", default="en",
+                   help="preferred language tag for labels and definitions (default: en); "
+                        "untagged literals rank next, other languages become synonyms")
     p.add_argument("--version", action="version", version=f"ttl3d {__version__}")
     return p
 
@@ -42,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         ds = load.load_files(args.files)
     except (OSError, load.LoadError) as e:
         return _fail(e)
-    data = graph.build(ds, color_by=args.color_by)
+    data = graph.build(ds, color_by=args.color_by, lang=args.lang)
     mode = layout.choose_layout(len(data["nodes"]), args.layout)
     if mode == "stress":
         notice = layout.stress_notice(len(data["nodes"]))

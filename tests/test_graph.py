@@ -5,8 +5,8 @@ from ttl3d import load, graph
 EX = "http://example.org/library#"
 
 
-def build(*files, color_by="file"):
-    return graph.build(load.load_files(files), color_by=color_by)
+def build(*files, **kw):
+    return graph.build(load.load_files(files), **kw)
 
 
 def ids(data):
@@ -123,3 +123,53 @@ def test_link_group_follows_the_asserting_file_only_in_file_mode(library, librar
 def test_invalid_color_by_is_rejected(library):
     with pytest.raises(ValueError):
         build(library, color_by="colour")
+
+
+def _by_local(data):
+    return {n["id"].rsplit("#", 1)[1]: n for n in data["nodes"]}
+
+
+def test_label_prefers_the_requested_language_then_untagged(tmp_path):
+    ttl = tmp_path / "lang.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/l#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   'ex:z rdfs:label "Zebra"@en, "Antilope"@de, "Cebra"@es .\n'
+                   'ex:u rdfs:label "Untagged", "Getaggt"@de .\n'
+                   'ex:s rdfs:label "Sol"@en, "Sol"@la .\n', encoding="utf-8")
+    en = _by_local(build(ttl, lang="en"))
+    assert en["z"]["label"] == "Zebra" and en["z"]["alt"] == ["Antilope", "Cebra"]
+    assert en["u"]["label"] == "Untagged" and en["u"]["alt"] == ["Getaggt"]
+    assert en["s"]["label"] == "Sol" and en["s"]["alt"] == []
+    de = _by_local(build(ttl, lang="de"))
+    assert de["z"]["label"] == "Antilope" and de["u"]["label"] == "Getaggt"
+    none = _by_local(build(ttl))
+    assert none["u"]["label"] == "Untagged" and none["z"]["label"] == "Antilope"
+
+
+def test_losing_definition_literals_stay_on_the_card(tmp_path):
+    ttl = tmp_path / "def.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\n"
+                   'ex:a skos:definition "Def." ; rdfs:comment "Comment." .\n', encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["definition"] == "Def." and a["props"] == {"comment": ["Comment."]}
+
+
+def test_literal_sources_go_to_properties_not_the_sources_list(tmp_path):
+    ttl = tmp_path / "src.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/s#> .\n"
+                   "@prefix dcterms: <http://purl.org/dc/terms/> .\n"
+                   "@prefix prov: <http://www.w3.org/ns/prov#> .\n"
+                   'ex:a dcterms:source "NASA fact sheets, 2020/21" ; prov:wasDerivedFrom ex:src .\n',
+                   encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["sources"] == [{"label": "src", "url": None}]
+    assert a["props"] == {"source": ["NASA fact sheets, 2020/21"]}
+
+
+def test_empty_default_prefix_is_a_bound_namespace(tmp_path):
+    ttl = tmp_path / "default.ttl"
+    ttl.write_text("@prefix : <http://example.org/default#> .\n:a :p :b .\n", encoding="utf-8")
+    data = build(ttl, color_by="namespace")
+    assert data["groups"] == [":"] and {n["ns"] for n in data["nodes"]} == {":"}
