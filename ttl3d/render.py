@@ -12,6 +12,7 @@ literal properties, relations and sources.
 from __future__ import annotations
 import html as _html
 import json
+import re
 from pathlib import Path
 
 VENDOR_JS = Path(__file__).parent / "vendor" / "fg3d-bundle.min.js"
@@ -30,7 +31,7 @@ def assign_colors(groups) -> dict:
 
 
 def _bundle() -> str:
-    lib = VENDOR_JS.read_text()
+    lib = _read(VENDOR_JS)
     if "</script" in lib:  # would break the inline embedding
         raise ValueError("vendored bundle contains a closing script tag")
     return "\n".join(l for l in lib.splitlines() if not l.startswith("//# sourceMappingURL"))
@@ -38,6 +39,24 @@ def _bundle() -> str:
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+_PLACEHOLDER = re.compile(r"__[A-Z]+__")
+
+
+def script_safe(value) -> str:
+    """JSON that is safe inside a <script> block: every '<', '>' and '&' becomes a
+    JS unicode escape, so no label, title or IRI can open or close a tag or an
+    HTML comment (the HTML5 tokenizer treats "<!--" + "<script" specially)."""
+    return (json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e")
+            .replace("&", "\\u0026"))
+
+
+def fill(template: str, values: dict[str, str]) -> str:
+    """Substitute every known __KEY__ in one pass. Unknown tokens (the vendor bundle
+    contains __THREE__) are left alone, and substituted text is never rescanned,
+    so data containing a placeholder name cannot be substituted a second time."""
+    return _PLACEHOLDER.sub(lambda m: values.get(m.group(), m.group()), template)
 
 
 def render_html(data: dict, *, title: str, pinned: bool, labels: dict) -> str:
@@ -50,24 +69,19 @@ def render_html(data: dict, *, title: str, pinned: bool, labels: dict) -> str:
     config = {"title": title, "colorBy": data.get("color_by", "file"),
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
                                                  "edge": bool(labels["edge"])}}
-    payload = json.dumps(data).replace("</", "<\\/")
-    return (HTML_TEMPLATE
-            .replace("__CSS__", _read(VIEWER_CSS))
-            .replace("__APP__", _read(VIEWER_JS))
-            .replace("__LIB__", _bundle())
-            .replace("__DATA__", payload)
-            .replace("__COLORS__", json.dumps(colors))
-            .replace("__CONFIG__", json.dumps(config))
-            .replace("__LEGEND__", legend)
-            .replace("__TITLE__", esc(title))
-            .replace("__COLORBY__", esc(config["colorBy"]))
-            .replace("__COUNTS__", f'{len(data["nodes"])} nodes / {len(data["links"])} links'))
+    app = fill(_read(VIEWER_JS), {"__DATA__": script_safe(data),
+                                  "__COLORS__": script_safe(colors),
+                                  "__CONFIG__": script_safe(config)})
+    return fill(HTML_TEMPLATE, {
+        "__CSS__": _read(VIEWER_CSS), "__LIB__": _bundle(), "__APP__": app,
+        "__LEGEND__": legend, "__TITLE__": esc(title), "__COLORBY__": esc(config["colorBy"]),
+        "__COUNTS__": f'{len(data["nodes"])} nodes / {len(data["links"])} links'})
 
 
 def write_html(html: str, out: Path | str) -> Path:
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html)
+    out.write_text(html, encoding="utf-8")
     return out
 
 

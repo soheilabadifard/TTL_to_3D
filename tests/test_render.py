@@ -1,7 +1,10 @@
 """ttl3d.render: the self-contained HTML page and the behaviors settled with the user."""
-import shutil, subprocess
+import json, os, shutil, subprocess, sys
+from pathlib import Path
 import pytest
 from ttl3d import load, graph, render
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
@@ -96,3 +99,40 @@ def test_viewer_js_is_valid_javascript(tmp_path):
     probe.write_text(js, encoding="utf-8")
     r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("label", ["<!--<script x", "__COLORS__ node", "__CONFIG__", "a </script> b", "x & y"])
+def test_hostile_labels_cannot_break_the_app_script(tmp_path, label):
+    ttl = tmp_path / "hostile.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/h#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   f'ex:a rdfs:label "{label}" ; ex:p ex:b .\n', encoding="utf-8")
+    data = graph.build(load.load_files([ttl]))
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    app = page.rsplit("<script>", 1)[1]
+    assert page.count("</script>") == 2 and "<!--" not in app and "<" not in app.split(";\n", 1)[0]
+    start = app.index("const DATA = ") + len("const DATA = ")
+    payload = app[start:app.index(";\n", start)]
+    assert json.loads(payload)["nodes"][0]["label"] == label
+
+
+def test_title_cannot_break_the_app_script(data):
+    page = render.render_html(data, title="x</script><b>", pinned=False,
+                              labels={"node": True, "edge": True})
+    assert page.count("</script>") == 2
+    assert "<title>x&lt;/script&gt;&lt;b&gt;</title>" in page
+
+
+def test_fill_substitutes_known_keys_once_and_leaves_the_rest():
+    out = render.fill("a __X__ b __Y__ c __Z__", {"__X__": "__Y__", "__Y__": "2"})
+    assert out == "a __Y__ b 2 c __Z__"
+
+
+def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
+    out = tmp_path / "u.html"
+    code = ("from ttl3d import render; "
+            f"render.write_html('<title>B\\u00fccher</title>', {str(out)!r})")
+    env = {**os.environ, "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0", "LC_ALL": "C", "LANG": "C"}
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO)
+    assert r.returncode == 0, r.stderr
+    assert out.read_bytes() == "<title>Bücher</title>".encode("utf-8")
