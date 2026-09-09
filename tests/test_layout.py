@@ -1,4 +1,5 @@
 """ttl3d.layout: scale rules and the pinned stress layout."""
+import math
 import pytest
 from ttl3d import layout
 
@@ -66,3 +67,16 @@ def test_stress_positions_are_reproducible():
     links = [{"source": f"n{i}", "target": f"n{i + 1}"} for i in range(11)]
     links.append({"source": "n0", "target": "n6"})
     assert layout.stress_positions(ids, links) == layout.stress_positions(ids, links)
+
+
+def test_components_never_come_closer_than_the_island_gap():
+    ids, links = ["m1", "m2"], [{"source": "m1", "target": "m2"}]
+    for i in range(12):
+        chain = [f"i{i}n{j}" for j in range(4)]
+        ids += chain
+        links += [{"source": a, "target": b} for a, b in zip(chain, chain[1:])]
+    pos = layout.stress_positions(ids, links)
+    component = {n: n.split("n")[0] if n.startswith("i") else "m" for n in ids}
+    closest = min(math.dist(pos[a], pos[b]) for a in ids for b in ids
+                  if component[a] != component[b])
+    assert closest >= layout.ISLAND_GAP - 1e-6

@@ -16,6 +16,8 @@ LAYOUT_MODES = ("auto", "stress", "force")
 LABEL_MODES = ("auto", "always", "hover")
 
 SEED = 0   # networkx seeds 3-D Kamada-Kawai from a random layout; fix it so a rebuild keeps the picture
+ISLAND_GAP = 60.0        # clearance between components, in scene units (about one rest length)
+ISLANDS_PER_ROW = 10     # islands are shelved left to right, then a new row starts
 
 
 def choose_layout(n_nodes: int, mode: str = "auto") -> str:
@@ -45,10 +47,19 @@ def _kk(G) -> dict:
     return nx.kamada_kawai_layout(G, dim=3, pos=nx.random_layout(G, dim=3, seed=SEED))
 
 
+def _scaled(p: dict, links: list[dict]) -> dict[str, list[float]]:
+    """Scale raw positions so the mean edge length is about 60 (the live rest length)."""
+    lens = [d for d in (math.dist(p[l["source"]], p[l["target"]])
+                        for l in links if l["source"] in p and l["target"] in p) if d > 0]
+    scale = 60 / (sum(lens) / len(lens)) if lens else 60
+    return {n: [round(float(c) * scale, 2) for c in xyz] for n, xyz in p.items()}
+
+
 def stress_positions(node_ids: list[str], links: list[dict]) -> dict[str, list[float]]:
-    """3D Kamada-Kawai positions for the largest component, scaled so the mean
-    edge length lands near the live rest length (~60); smaller components are
-    parked on a grid beyond the main body."""
+    """3D Kamada-Kawai positions per connected component. The largest component
+    sits at the origin; every other component gets its own layout and is shelved
+    to the right of the main body, ISLANDS_PER_ROW per row, with ISLAND_GAP of
+    clearance between components."""
     import networkx as nx
     if not node_ids:
         return {}
@@ -56,17 +67,19 @@ def stress_positions(node_ids: list[str], links: list[dict]) -> dict[str, list[f
     H.add_nodes_from(node_ids)
     H.add_edges_from((l["source"], l["target"]) for l in links if l["source"] != l["target"])
     comps = sorted(nx.connected_components(H), key=lambda c: (-len(c), sorted(c)[0]))
-    pos: dict[str, list[float]] = {}
-    main = comps[0]
-    p = _kk(H.subgraph(main))
-    lens = [d for d in (math.dist(p[l["source"]], p[l["target"]])
-                        for l in links if l["source"] in p and l["target"] in p) if d > 0]
-    scale = 60 / (sum(lens) / len(lens)) if lens else 60
-    for n, xyz in p.items():
-        pos[n] = [round(float(c) * scale, 2) for c in xyz]
+    pos = _scaled(_kk(H.subgraph(comps[0])), links)
     reach = max((abs(c) for xyz in pos.values() for c in xyz), default=0.0)
-    for i, comp in enumerate(comps[1:]):
-        col, row = i % 10, i // 10
-        for j, n in enumerate(sorted(comp)):
-            pos[n] = [reach + 60 + col * 80, row * 80.0 + j * 45.0, 0.0]
+    x_start = reach + ISLAND_GAP
+    x, row_y, row_h, col = x_start, 0.0, 0.0, 0
+    for comp in comps[1:]:
+        island = _scaled(_kk(H.subgraph(comp)), links)
+        xs = [q[0] for q in island.values()]
+        ys = [q[1] for q in island.values()]
+        if col == ISLANDS_PER_ROW:
+            x, row_y, row_h, col = x_start, row_y + row_h + ISLAND_GAP, 0.0, 0
+        for n, (px, py, pz) in island.items():
+            pos[n] = [round(px - min(xs) + x, 2), round(py - min(ys) + row_y, 2), round(pz, 2)]
+        x += max(xs) - min(xs) + ISLAND_GAP
+        row_h = max(row_h, max(ys) - min(ys))
+        col += 1
     return pos
