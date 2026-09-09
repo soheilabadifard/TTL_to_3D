@@ -72,6 +72,7 @@ def test_cli_malformed_file_is_a_clean_error(tmp_path, capsys):
     assert rc == 1
     err = capsys.readouterr().err
     assert err.startswith("ttl3d: error:") and "bad.ttl" in err
+    assert err.count("\n") == 1
 
 
 def test_cli_refuses_to_overwrite_an_input(tmp_path, library, capsys):

@@ -37,7 +37,10 @@ def _parse(f: Path) -> Graph:
     try:
         g.parse(f, format=fmt)
     except Exception as e:  # every rdflib parser plugin raises its own class
-        raise LoadError(f"{f}: cannot parse as {fmt}: {e}") from e
+        # collapse whitespace: rdflib's BadSyntax (and others) embed literal
+        # newlines, and the message must stay on one stderr line
+        detail = " ".join(str(e).split())
+        raise LoadError(f"{f}: cannot parse as {fmt}: {detail}") from e
     return g
 
 

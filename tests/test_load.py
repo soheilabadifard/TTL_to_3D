@@ -47,3 +47,4 @@ def test_malformed_file_raises_load_error_naming_the_file(tmp_path):
     with pytest.raises(load.LoadError) as e:
         load.load_files([bad])
     assert "bad.ttl" in str(e.value)
+    assert "\n" not in str(e.value)
