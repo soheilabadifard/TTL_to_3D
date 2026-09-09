@@ -156,6 +156,16 @@ def test_losing_definition_literals_stay_on_the_card(tmp_path):
     assert a["definition"] == "Def." and a["props"] == {"comment": ["Comment."]}
 
 
+def test_a_losing_definition_with_the_same_text_is_still_kept(tmp_path):
+    ttl = tmp_path / "same.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\n"
+                   'ex:a skos:definition "Same." ; rdfs:comment "Same." .\n', encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["definition"] == "Same." and a["props"] == {"comment": ["Same."]}
+
+
 def test_literal_sources_go_to_properties_not_the_sources_list(tmp_path):
     ttl = tmp_path / "src.ttl"
     ttl.write_text("@prefix ex: <http://example.org/s#> .\n"

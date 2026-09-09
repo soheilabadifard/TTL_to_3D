@@ -122,11 +122,12 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
         types = sorted(local(t) for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
         label_vals = [str(o) for p in LABEL_PREDS for o in _literals(g, n, p, lang)]
         definition = _first(g, n, DEFINITION_PREDS, lang)
+        def_pred = next((p for p in DEFINITION_PREDS if _literals(g, n, p, lang)), None)
         props = defaultdict(list)
         for _, p, o in g.triples((n, None, None)):
             if not isinstance(o, Literal) or p in LABEL_PREDS or p == SKOS.altLabel:
                 continue
-            if p in DEFINITION_PREDS and str(o) == definition:
+            if p == def_pred and str(o) == definition:
                 continue
             props[local(p)].append(str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
