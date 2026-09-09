@@ -1,4 +1,5 @@
 """ttl3d.cli: the command line entry point."""
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -107,3 +108,17 @@ def test_cli_announces_a_big_stress_layout_on_stderr(tmp_path, capsys):
                    + "".join(f"ex:n{i} ex:p ex:n{i + 1} .\n" for i in range(n)), encoding="utf-8")
     assert cli.main([str(ttl), "-o", str(tmp_path / "big.html")]) == 0
     assert "stress layout" in capsys.readouterr().err
+
+
+def test_cli_output_is_identical_across_processes(tmp_path):
+    pages = []
+    for seed in ("1", "2"):
+        out = tmp_path / f"solar-{seed}.html"
+        r = subprocess.run([sys.executable, "-m", "ttl3d",
+                            str(REPO / "examples" / "solar-system.ttl"),
+                            str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
+                           capture_output=True, text=True, cwd=REPO,
+                           env={**os.environ, "PYTHONHASHSEED": seed})
+        assert r.returncode == 0, r.stderr
+        pages.append(out.read_bytes())
+    assert pages[0] == pages[1]

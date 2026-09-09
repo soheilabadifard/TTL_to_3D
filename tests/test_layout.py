@@ -1,7 +1,13 @@
 """ttl3d.layout: scale rules and the pinned stress layout."""
 import math
+import os
+import subprocess
+import sys
+from pathlib import Path
 import pytest
 from ttl3d import layout
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 def test_auto_layout_is_stress_up_to_the_threshold_then_force():
@@ -87,3 +93,20 @@ def test_stress_notice_is_silent_for_small_graphs_and_warns_past_the_auto_limit(
     assert "stress layout" in layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
     big = layout.stress_notice(layout.STRESS_MAX_NODES + 1)
     assert "--layout force" in big
+
+
+def test_layout_is_identical_across_processes_with_different_hash_seeds():
+    code = (
+        "import json\n"
+        "from ttl3d import layout\n"
+        "ids = [f'n{i}' for i in range(30)]\n"
+        "links = [{'source': f'n{i}', 'target': f'n{i + 1}'} for i in range(9)]\n"
+        "links += [{'source': f'n{i}', 'target': f'n{i + 1}'} for i in range(10, 29) if i % 3 != 0]\n"
+        "print(json.dumps(layout.stress_positions(ids, links), sort_keys=True))\n")
+    outs = []
+    for seed in ("1", "2"):
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO,
+                           env={**os.environ, "PYTHONHASHSEED": seed})
+        assert r.returncode == 0, r.stderr
+        outs.append(r.stdout)
+    assert outs[0] == outs[1]

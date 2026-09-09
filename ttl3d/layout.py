@@ -52,12 +52,19 @@ def stress_notice(n_nodes: int) -> str | None:
 
 
 def _kk(G) -> dict:
-    """3-D Kamada-Kawai positions for one connected graph, seeded so the same
-    input always gives the same picture. A single node sits at the origin."""
+    """3-D Kamada-Kawai positions for one connected graph, identical in every
+    process for the same input: a subgraph view iterates in set order (which
+    follows Python's per-process hash seed), so the nodes and edges are handed
+    to networkx in sorted order and the start positions are seeded. A single
+    node sits at the origin."""
     import networkx as nx
-    if G.number_of_nodes() == 1:
-        return {next(iter(G)): [0.0, 0.0, 0.0]}
-    return nx.kamada_kawai_layout(G, dim=3, pos=nx.random_layout(G, dim=3, seed=SEED))
+    nodes = sorted(G, key=str)
+    if len(nodes) == 1:
+        return {nodes[0]: [0.0, 0.0, 0.0]}
+    S = nx.Graph()
+    S.add_nodes_from(nodes)
+    S.add_edges_from(sorted((min(u, v, key=str), max(u, v, key=str)) for u, v in G.edges()))
+    return nx.kamada_kawai_layout(S, dim=3, pos=nx.random_layout(S, dim=3, seed=SEED))
 
 
 def _scaled(p: dict, links: list[dict]) -> dict[str, list[float]]:
