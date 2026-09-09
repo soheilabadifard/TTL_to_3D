@@ -7,6 +7,10 @@ from rdflib import Graph
 from rdflib.util import guess_format
 
 
+class LoadError(ValueError):
+    """An input file could not be parsed; the message names the file."""
+
+
 @dataclass
 class Dataset:
     files: list[Path]
@@ -27,6 +31,16 @@ def _unique_key(stem: str, taken: dict) -> str:
     return key
 
 
+def _parse(f: Path) -> Graph:
+    g = Graph()
+    fmt = guess_format(str(f)) or "turtle"
+    try:
+        g.parse(f, format=fmt)
+    except Exception as e:  # every rdflib parser plugin raises its own class
+        raise LoadError(f"{f}: cannot parse as {fmt}: {e}") from e
+    return g
+
+
 def load_files(paths: Iterable[str | Path]) -> Dataset:
     files = [Path(p) for p in paths]
     graphs: dict[str, Graph] = {}
@@ -35,8 +49,7 @@ def load_files(paths: Iterable[str | Path]) -> Dataset:
     for f in files:
         if not f.is_file():
             raise FileNotFoundError(f)
-        g = Graph()
-        g.parse(f, format=guess_format(str(f)) or "turtle")
+        g = _parse(f)
         graphs[_unique_key(f.stem, graphs)] = g
         for triple in g:
             merged.add(triple)

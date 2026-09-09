@@ -18,6 +18,7 @@ LABEL_MODES = ("auto", "always", "hover")
 SEED = 0   # networkx seeds 3-D Kamada-Kawai from a random layout; fix it so a rebuild keeps the picture
 ISLAND_GAP = 60.0        # clearance between components, in scene units (about one rest length)
 ISLANDS_PER_ROW = 10     # islands are shelved left to right, then a new row starts
+PROGRESS_MIN_NODES = 200   # below this the stress layout is instant; say nothing
 
 
 def choose_layout(n_nodes: int, mode: str = "auto") -> str:
@@ -36,6 +37,18 @@ def choose_labels(n_nodes: int, n_links: int, mode: str = "auto") -> dict:
     if mode == "hover":
         return {"node": False, "edge": False}
     return {"node": n_nodes <= LABEL_MAX_NODES, "edge": n_links <= LABEL_MAX_LINKS}
+
+
+def stress_notice(n_nodes: int) -> str | None:
+    """One stderr line before a stress layout that will take a while (None when it won't).
+    Kamada-Kawai is quadratic: ~0.6 s at 200 nodes, ~2.4 s at 500, ~9 s at 1000."""
+    if n_nodes <= PROGRESS_MIN_NODES:
+        return None
+    msg = f"computing stress layout for {n_nodes} nodes..."
+    if n_nodes > STRESS_MAX_NODES:
+        msg += (f" (more than {STRESS_MAX_NODES}: this is quadratic and may take minutes;"
+                " --layout force skips it)")
+    return msg
 
 
 def _kk(G) -> dict:

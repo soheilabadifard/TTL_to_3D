@@ -80,3 +80,10 @@ def test_components_never_come_closer_than_the_island_gap():
     closest = min(math.dist(pos[a], pos[b]) for a in ids for b in ids
                   if component[a] != component[b])
     assert closest >= layout.ISLAND_GAP - 1e-6
+
+
+def test_stress_notice_is_silent_for_small_graphs_and_warns_past_the_auto_limit():
+    assert layout.stress_notice(layout.PROGRESS_MIN_NODES) is None
+    assert "stress layout" in layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
+    big = layout.stress_notice(layout.STRESS_MAX_NODES + 1)
+    assert "--layout force" in big

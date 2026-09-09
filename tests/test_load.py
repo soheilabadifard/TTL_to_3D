@@ -39,3 +39,11 @@ def test_missing_file_raises(tmp_path):
 def test_namespace_prefixes_collected(library):
     ds = load.load_files([library])
     assert ds.prefixes["http://example.org/library#"] == "ex"
+
+
+def test_malformed_file_raises_load_error_naming_the_file(tmp_path):
+    bad = tmp_path / "bad.ttl"
+    bad.write_text("this is not turtle @@@\n", encoding="utf-8")
+    with pytest.raises(load.LoadError) as e:
+        load.load_files([bad])
+    assert "bad.ttl" in str(e.value)
