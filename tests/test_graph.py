@@ -1,6 +1,7 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
 from pathlib import Path
 import pytest
+from rdflib import URIRef
 from ttl3d import load, graph
 
 REPO = Path(__file__).resolve().parents[1]
@@ -216,3 +217,29 @@ def test_demo_has_no_stacked_inverse_links():
     pairs = {(l["source"], l["target"]) for l in data["links"]}
     assert not any((t, s) in pairs for s, t in pairs)
     assert sum(1 for l in data["links"] if l["reverse"]) == 12
+
+
+def test_type_links_connect_instances_to_their_classes(library):
+    data = build(library, type_links=True)
+    assert ("Herbert", "type", "Author") in edges(data)
+    assert ("Book", "type", "Class") not in edges(data)      # owl:Class is reserved vocabulary
+
+
+def test_attribute_preds_demote_a_relation_to_the_card(tmp_path):
+    ttl = tmp_path / "attr.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/a#> .\n"
+                   "@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n"
+                   "ex:alice foaf:homepage <https://alice.example/> ; ex:knows ex:bob .\n",
+                   encoding="utf-8")
+    ds = load.load_files([ttl])
+    data = graph.build(ds, attribute_preds=graph.resolve_terms(["foaf:homepage"], ds))
+    assert [l["predicates"] for l in data["links"]] == [["knows"]]
+    assert not any(n["id"].startswith("https://alice.example") for n in data["nodes"])
+
+
+def test_resolve_terms_expands_curies_and_rejects_unknown_prefixes(library):
+    ds = load.load_files([library])
+    assert graph.resolve_terms(["ex:wrote", "http://example.org/x#p"], ds) == {
+        URIRef("http://example.org/library#wrote"), URIRef("http://example.org/x#p")}
+    with pytest.raises(ValueError):
+        graph.resolve_terms(["nope:thing"], ds)

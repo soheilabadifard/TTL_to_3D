@@ -25,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
                         "untagged literals rank next, other languages become synonyms")
+    p.add_argument("--type-links", action="store_true",
+                   help="draw rdf:type as an edge from each instance to its class (default: card only)")
+    p.add_argument("--attribute-preds", action="append", default=[], metavar="PRED[,PRED...]",
+                   help="predicates to show on the card instead of drawing, as prefix:local or full IRIs "
+                        "(e.g. foaf:homepage,rdfs:seeAlso); repeatable")
     p.add_argument("--format", metavar="NAME",
                    help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
                         "default: guess from the extension, then try turtle")
@@ -46,9 +51,12 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
         ds = load.load_files(args.files, fmt=args.format)
-    except (OSError, load.LoadError) as e:
+        extra = graph.resolve_terms([t for arg in args.attribute_preds for t in arg.split(",") if t],
+                                    ds)
+    except (OSError, ValueError) as e:      # LoadError is a ValueError
         return _fail(e)
-    data = graph.build(ds, color_by=args.color_by, lang=args.lang)
+    data = graph.build(ds, color_by=args.color_by, lang=args.lang,
+                       type_links=args.type_links, attribute_preds=extra)
     mode = layout.choose_layout(len(data["nodes"]), args.layout)
     if mode == "stress":
         notice = layout.stress_notice(len(data["nodes"]))

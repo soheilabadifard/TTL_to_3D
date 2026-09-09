@@ -141,3 +141,17 @@ def test_cli_format_flag(tmp_path, library):
     weird.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
     out = tmp_path / "f.html"
     assert cli.main([str(weird), "-o", str(out), "--format", "turtle"]) == 0 and out.exists()
+
+
+def test_cli_type_links_and_attribute_preds(tmp_path, library):
+    out = tmp_path / "t.html"
+    cli.main([str(library), "-o", str(out), "--type-links", "--attribute-preds", "ex:wrote,rdfs:subClassOf"])
+    payload = out.read_text(encoding="utf-8").split("const DATA = ", 1)[1].split(";\n", 1)[0]
+    assert '"predicates": ["type"]' in payload          # Herbert -> Author is now drawn
+    assert '"predicates": ["wrote"]' not in payload     # ex:wrote is demoted to the card
+    assert '"predicates": ["subClassOf"]' not in payload
+
+
+def test_cli_unknown_prefix_in_attribute_preds_is_a_clean_error(tmp_path, library, capsys):
+    rc = cli.main([str(library), "-o", str(tmp_path / "x.html"), "--attribute-preds", "nope:thing"])
+    assert rc == 1 and "nope" in capsys.readouterr().err

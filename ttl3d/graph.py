@@ -70,7 +70,23 @@ def _prefix(ds: Dataset, ns: str) -> str:
     return ns
 
 
-def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
+def resolve_terms(terms, ds: Dataset) -> set:
+    """Turn 'prefix:local' or full IRIs into URIRefs using the dataset's bindings."""
+    by_prefix = {prefix: ns for ns, prefix in ds.prefixes.items()}
+    out = set()
+    for term in terms:
+        if "://" in term:
+            out.add(URIRef(term))
+            continue
+        prefix, _, name = term.partition(":")
+        if prefix not in by_prefix:
+            raise ValueError(f"unknown prefix in {term!r}; bind it in an input file or use a full IRI")
+        out.add(URIRef(by_prefix[prefix] + name))
+    return out
+
+
+def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
+          type_links: bool = False, attribute_preds=()) -> dict:
     if color_by not in COLOR_KEYS:
         raise ValueError(f"color_by must be one of {COLOR_KEYS}, got {color_by!r}")
     g = ds.merged
@@ -80,8 +96,10 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
         return (isinstance(t, URIRef) and t not in headers
                 and not str(t).startswith(RESERVED))
 
+    attribute = (set(ATTRIBUTE_PREDS) | set(attribute_preds)) - ({RDF.type} if type_links else set())
+
     def is_link(s, p, o) -> bool:
-        return eligible(s) and eligible(o) and p not in ATTRIBUTE_PREDS
+        return eligible(s) and eligible(o) and p not in attribute
 
     node_file: dict = {}          # node -> first file declaring it as a subject
     mention_file: dict = {}       # node -> first file asserting a link touching it
