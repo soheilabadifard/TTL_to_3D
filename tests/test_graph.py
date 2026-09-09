@@ -1,6 +1,9 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
+from pathlib import Path
 import pytest
 from ttl3d import load, graph
+
+REPO = Path(__file__).resolve().parents[1]
 
 EX = "http://example.org/library#"
 
@@ -183,3 +186,33 @@ def test_empty_default_prefix_is_a_bound_namespace(tmp_path):
     ttl.write_text("@prefix : <http://example.org/default#> .\n:a :p :b .\n", encoding="utf-8")
     data = build(ttl, color_by="namespace")
     assert data["groups"] == [":"] and {n["ns"] for n in data["nodes"]} == {":"}
+
+
+def test_inverse_pairs_collapse_into_one_bidirectional_link(tmp_path):
+    ttl = tmp_path / "inv.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/i#> .\n"
+                   "ex:earth ex:hasMoon ex:luna .\nex:luna ex:orbits ex:earth .\n", encoding="utf-8")
+    data = build(ttl)
+    assert len(data["links"]) == 1
+    link = data["links"][0]
+    assert link["source"].endswith("#earth") and link["target"].endswith("#luna")
+    assert link["predicates"] == ["hasMoon"] and link["reverse"] == ["orbits"]
+
+
+def test_a_link_only_asserted_backwards_still_points_forwards(tmp_path):
+    ttl = tmp_path / "back.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/i#> .\nex:zeta ex:p ex:alpha .\n", encoding="utf-8")
+    link = build(ttl)["links"][0]
+    assert link["source"].endswith("#zeta") and link["predicates"] == ["p"] and link["reverse"] == []
+
+
+def test_one_way_links_have_an_empty_reverse_list(library):
+    assert all(l["reverse"] == [] for l in build(library)["links"])
+
+
+def test_demo_has_no_stacked_inverse_links():
+    data = graph.build(load.load_files([REPO / "examples" / "solar-system.ttl",
+                                        REPO / "examples" / "solar-system-missions.ttl"]))
+    pairs = {(l["source"], l["target"]) for l in data["links"]}
+    assert not any((t, s) in pairs for s, t in pairs)
+    assert sum(1 for l in data["links"] if l["reverse"]) == 12

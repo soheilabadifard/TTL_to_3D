@@ -4,10 +4,11 @@ Nodes are every IRI that is a subject of some triple or the object of a link,
 except IRIs of the RDF/RDFS/OWL/XSD vocabularies and ontology headers.
 Links are IRI-to-IRI triples whose predicate describes a relation rather than
 an attribute (rdf:type, imports and provenance go to the node card instead).
-Parallel edges collapse into one link listing every predicate. Each node
-remembers the file that first declares it; each link remembers the file(s)
-asserting it, so a file that only adds edges between other files' nodes still
-owns something visible.
+Parallel edges collapse into one link listing every predicate; an edge
+asserted in both directions is one link whose `reverse` list holds the
+predicates pointing back. Each node remembers the file that first declares
+it; each link remembers the file(s) asserting it, so a file that only adds
+edges between other files' nodes still owns something visible.
 
 A node's label is chosen by preference tier: the requested `--lang` language
 first, then untagged literals, then any other language, alphabetical within
@@ -84,7 +85,7 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
 
     node_file: dict = {}          # node -> first file declaring it as a subject
     mention_file: dict = {}       # node -> first file asserting a link touching it
-    link_files: dict = defaultdict(list)   # (s, o) -> files asserting any predicate
+    link_files: dict = defaultdict(list)   # unordered pair -> files asserting any predicate
     for key, fg in ds.graphs.items():
         for s, p, o in fg:
             if eligible(s):
@@ -92,17 +93,19 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
             if is_link(s, p, o):
                 mention_file.setdefault(s, key)
                 mention_file.setdefault(o, key)
-                if key not in link_files[(s, o)]:
-                    link_files[(s, o)].append(key)
+                pair = tuple(sorted((s, o), key=str))
+                if key not in link_files[pair]:
+                    link_files[pair].append(key)
 
-    merged_links: dict = defaultdict(set)
+    merged_links: dict = defaultdict(lambda: {"fwd": set(), "rev": set()})   # pair -> predicates per direction
     node_ids = set()
     for s, p, o in g:
         if eligible(s):
             node_ids.add(s)
         if is_link(s, p, o):
             node_ids.add(o)
-            merged_links[(s, o)].add(local(p))
+            a, b = sorted((s, o), key=str)
+            merged_links[(a, b)]["fwd" if s == a else "rev"].add(local(p))
 
     labels = {}
     for s in node_ids:
@@ -149,10 +152,11 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None) -> dict:
         })
 
     links = []
-    for (s, o), preds in sorted(merged_links.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
-        files = link_files.get((s, o), [])
-        links.append({"source": str(s), "target": str(o), "predicates": sorted(preds),
-                      "files": files,
+    for (a, b), d in sorted(merged_links.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
+        src, tgt, fwd, rev = (a, b, d["fwd"], d["rev"]) if d["fwd"] else (b, a, d["rev"], d["fwd"])
+        files = link_files.get((a, b), [])
+        links.append({"source": str(src), "target": str(tgt), "predicates": sorted(fwd),
+                      "reverse": sorted(rev), "files": files,
                       "group": (files[0] if files else "?") if color_by == "file" else None})
 
     groups = {n["group"] for n in nodes}

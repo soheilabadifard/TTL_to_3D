@@ -136,3 +136,9 @@ def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO)
     assert r.returncode == 0, r.stderr
     assert out.read_bytes() == "<title>Bücher</title>".encode("utf-8")
+
+
+def test_viewer_labels_bidirectional_links_with_both_predicates():
+    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    assert "const linkText = " in js and "⇄" in js
+    assert "l.reverse.length ? 0 : 4.5" in js

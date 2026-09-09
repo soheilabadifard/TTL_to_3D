@@ -16,9 +16,19 @@ DATA.links.forEach(l => {
   deg[l.source] = (deg[l.source]||0)+1; deg[l.target] = (deg[l.target]||0)+1;
   (nbr[l.source] ??= new Set()).add(l.target);
   (nbr[l.target] ??= new Set()).add(l.source);
-  (rels[l.source] ??= []).push({dir:'out', pred:l.predicates.join(', '), other:l.target});
-  (rels[l.target] ??= []).push({dir:'in',  pred:l.predicates.join(', '), other:l.source});
+  if (l.predicates.length) {
+    (rels[l.source] ??= []).push({dir:'out', pred:l.predicates.join(', '), other:l.target});
+    (rels[l.target] ??= []).push({dir:'in',  pred:l.predicates.join(', '), other:l.source});
+  }
+  if (l.reverse.length) {
+    (rels[l.target] ??= []).push({dir:'out', pred:l.reverse.join(', '), other:l.source});
+    (rels[l.source] ??= []).push({dir:'in',  pred:l.reverse.join(', '), other:l.target});
+  }
 });
+// a link asserted both ways carries both predicate lists and no arrowhead
+const linkText = l => l.reverse.length
+  ? `${l.predicates.join(', ')} ⇄ ${l.reverse.join(', ')}`
+  : l.predicates.join(', ');
 const radius = n => 5 + Math.sqrt(deg[n.id]||0) * 1.8;
 const rOf = x => radius(typeof x === 'object' ? x : {id: x});
 const colorOf = n => COLORS[n.group] || COLORS['?'];
@@ -56,7 +66,7 @@ function nodeObj(n) {
 function linkObj(l) {
   l.__sprite = null;
   if (!showEdgeLabels) return undefined;
-  const s = new SpriteText(l.predicates.join(', '));
+  const s = new SpriteText(linkText(l));
   s.color = l._dim ? DIM_LABEL : LINK_LABEL;
   s.textHeight = 2.4;
   l.__sprite = s;
@@ -71,7 +81,7 @@ const Graph = ForceGraph3D()(document.getElementById('graph'))
   .linkColor(l => l._dim ? DIM_LINK : linkColorOf(l))
   .linkWidth(1.2)
   .linkOpacity(0.55)
-  .linkDirectionalArrowLength(4.5)
+  .linkDirectionalArrowLength(l => l.reverse.length ? 0 : 4.5)
   .linkDirectionalArrowRelPos(1)
   .linkThreeObjectExtend(true)
   .linkThreeObject(linkObj)
