@@ -7,6 +7,7 @@ precomputed layout, and past the label thresholds the sprites are not
 created (hover tooltips still work).
 """
 from __future__ import annotations
+
 import math
 
 STRESS_MAX_NODES = 1000
@@ -86,7 +87,7 @@ def stress_positions(node_ids: list[str], links: list[dict]) -> dict[str, list[f
     H = nx.Graph()
     H.add_nodes_from(node_ids)
     H.add_edges_from((l["source"], l["target"]) for l in links if l["source"] != l["target"])
-    comps = sorted(nx.connected_components(H), key=lambda c: (-len(c), sorted(c)[0]))
+    comps = sorted(nx.connected_components(H), key=lambda c: (-len(c), min(c)))
     pos = _scaled(_kk(H.subgraph(comps[0])), links)
     reach = max((abs(c) for xyz in pos.values() for c in xyz), default=0.0)
     x_start = reach + ISLAND_GAP

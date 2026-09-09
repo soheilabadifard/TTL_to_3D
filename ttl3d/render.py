@@ -10,6 +10,7 @@ inclusively, and a card opens on click with the node's definition, synonyms,
 literal properties, relations and sources.
 """
 from __future__ import annotations
+
 import html as _html
 import json
 import re

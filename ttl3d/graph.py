@@ -20,10 +20,13 @@ its pick stays visible in the property table instead of vanishing. Literal
 too; only IRI sources appear in the node's `sources` list.
 """
 from __future__ import annotations
+
 import re
 from collections import defaultdict
+
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
+
 from .load import Dataset
 
 COLOR_KEYS = ("file", "type", "namespace")

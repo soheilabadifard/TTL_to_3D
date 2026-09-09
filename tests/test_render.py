@@ -1,8 +1,14 @@
 """ttl3d.render: the self-contained HTML page and the behaviors settled with the user."""
-import json, os, shutil, subprocess, sys
+import json
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
+
 import pytest
-from ttl3d import load, graph, render
+
+from ttl3d import graph, load, render
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -124,7 +130,7 @@ def test_viewer_js_is_valid_javascript(tmp_path):
         js = js.replace(key, "{}")
     probe = tmp_path / "viewer-probe.js"
     probe.write_text(js, encoding="utf-8")
-    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True)
+    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True, check=False)
     assert r.returncode == 0, r.stderr
 
 
@@ -160,9 +166,10 @@ def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
     code = ("from ttl3d import render; "
             f"render.write_html('<title>B\\u00fccher</title>', {str(out)!r})")
     env = {**os.environ, "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0", "LC_ALL": "C", "LANG": "C"}
-    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO)
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO,
+                       check=False)
     assert r.returncode == 0, r.stderr
-    assert out.read_bytes() == "<title>Bücher</title>".encode("utf-8")
+    assert out.read_bytes() == "<title>Bücher</title>".encode()
 
 
 def test_viewer_labels_bidirectional_links_with_both_predicates():

@@ -1,8 +1,10 @@
 """Command line entry point: ttl3d FILE [FILE ...] [-o OUT] [--color-by KEY] ..."""
 from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path
+
 from . import __version__, graph, layout, load, render
 
 

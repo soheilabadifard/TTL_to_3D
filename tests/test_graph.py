@@ -1,8 +1,10 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
 from pathlib import Path
+
 import pytest
 from rdflib import URIRef
-from ttl3d import load, graph
+
+from ttl3d import graph, load
 
 REPO = Path(__file__).resolve().parents[1]
 

@@ -1,8 +1,10 @@
 """Parse one or more RDF files into a merged graph that remembers which file said what."""
 from __future__ import annotations
+
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+
 from rdflib import Graph
 from rdflib.util import guess_format
 

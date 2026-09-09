@@ -3,6 +3,7 @@
 import subprocess
 import sys
 from pathlib import Path
+
 import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
@@ -15,7 +16,7 @@ def test_demo_page_runs_without_console_errors(tmp_path):
     r = subprocess.run([sys.executable, "-m", "ttl3d",
                         str(REPO / "examples" / "solar-system.ttl"),
                         str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO)
+                       capture_output=True, text=True, cwd=REPO, check=False)
     assert r.returncode == 0, r.stderr
     # the CLI prints "<nodes> nodes, <links> links -> <path> ..." on success (see tests/test_cli.py)
     n_nodes = int(r.stdout.split()[0])

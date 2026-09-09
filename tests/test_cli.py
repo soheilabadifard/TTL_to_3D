@@ -3,7 +3,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
 import pytest
+
 from ttl3d import cli
 
 REPO = Path(__file__).resolve().parents[1]
@@ -52,7 +54,7 @@ def test_cli_rejects_an_unknown_color_key(library):
 def test_module_entry_point_runs(tmp_path, library):
     out = tmp_path / "m.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(library), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO)
+                       capture_output=True, text=True, cwd=REPO, check=False)
     assert r.returncode == 0, r.stderr
     assert out.exists()
 
@@ -117,7 +119,7 @@ def test_cli_output_is_identical_across_processes(tmp_path):
         r = subprocess.run([sys.executable, "-m", "ttl3d",
                             str(REPO / "examples" / "solar-system.ttl"),
                             str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
-                           capture_output=True, text=True, cwd=REPO,
+                           capture_output=True, text=True, cwd=REPO, check=False,
                            env={**os.environ, "PYTHONHASHSEED": seed})
         assert r.returncode == 0, r.stderr
         pages.append(out.read_bytes())

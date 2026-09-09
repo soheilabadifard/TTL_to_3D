@@ -1,5 +1,6 @@
 """ttl3d.load: parse one or more RDF files, keeping which file said what."""
 import pytest
+
 from ttl3d import load
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ttl3d"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Turn any Turtle / RDF graph into a self-contained, offline 3D HTML viewer"
 readme = "README.md"
 license = {text = "MIT"}
@@ -32,11 +32,21 @@ Issues = "https://github.com/soheilabadifard/TTL_to_3D/issues"
 [project.scripts]
 ttl3d = "ttl3d.cli:main"
 
+[project.optional-dependencies]
+test = ["pytest"]
+browser = ["pytest", "playwright"]
+
 [tool.setuptools.packages.find]
 include = ["ttl3d*"]
 
 [tool.setuptools.package-data]
 ttl3d = ["vendor/*.js", "vendor/*.md", "viewer.js", "viewer.css"]
 
+[tool.setuptools.dynamic]
+version = {attr = "ttl3d.__version__"}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110

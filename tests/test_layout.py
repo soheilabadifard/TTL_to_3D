@@ -1,10 +1,13 @@
 """ttl3d.layout: scale rules and the pinned stress layout."""
+import itertools
 import math
 import os
 import subprocess
 import sys
 from pathlib import Path
+
 import pytest
+
 from ttl3d import layout
 
 REPO = Path(__file__).resolve().parents[1]
@@ -80,7 +83,7 @@ def test_components_never_come_closer_than_the_island_gap():
     for i in range(12):
         chain = [f"i{i}n{j}" for j in range(4)]
         ids += chain
-        links += [{"source": a, "target": b} for a, b in zip(chain, chain[1:])]
+        links += [{"source": a, "target": b} for a, b in itertools.pairwise(chain)]
     pos = layout.stress_positions(ids, links)
     component = {n: n.split("n")[0] if n.startswith("i") else "m" for n in ids}
     closest = min(math.dist(pos[a], pos[b]) for a in ids for b in ids
@@ -106,7 +109,7 @@ def test_layout_is_identical_across_processes_with_different_hash_seeds():
     outs = []
     for seed in ("1", "2"):
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO,
-                           env={**os.environ, "PYTHONHASHSEED": seed})
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed})
         assert r.returncode == 0, r.stderr
         outs.append(r.stdout)
     assert outs[0] == outs[1]
