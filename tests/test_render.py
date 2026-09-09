@@ -28,8 +28,8 @@ def test_page_is_self_contained(html):
     assert "<title>Library</title>" in html
 
 
-def test_legend_lists_every_group_with_its_color_and_is_clickable(html):
-    colors = render.assign_colors(["library", "library-extra"])
+def test_legend_lists_every_group_with_its_color_and_is_clickable(html, data):
+    colors = render.assign_colors(["library", "library-extra"], render.group_counts(data))
     for g in ("library", "library-extra"):
         assert f'data-group="{g}"' in html, g
         assert colors[g] in html
@@ -63,10 +63,37 @@ def test_config_is_embedded(data):
     assert '"pinned": false' in free
 
 
-def test_palette_cycles_and_unknown_is_gray():
-    colors = render.assign_colors([f"g{i}" for i in range(15)])
-    assert len(colors) == 16 and colors["?"] == render.UNKNOWN_COLOR
-    assert len(set(colors.values())) == len(render.PALETTE) + 1
+def test_up_to_twelve_groups_all_get_their_own_colour():
+    colors = render.assign_colors([f"g{i:02d}" for i in range(12)])
+    assert len(set(colors.values())) == 13 and colors["?"] == render.UNKNOWN_COLOR
+
+
+def test_only_the_largest_groups_keep_a_colour_past_twelve():
+    groups = [f"g{i:02d}" for i in range(15)]
+    counts = {g: 15 - i for i, g in enumerate(groups)}          # g00 is the biggest
+    colors = render.assign_colors(groups, counts)
+    assert len({colors[g] for g in groups[:11]}) == 11
+    assert all(colors[g] == render.OTHER_COLOR for g in groups[11:])
+    assert colors["?"] == render.UNKNOWN_COLOR
+    top, rest = render.rank_groups(groups, counts)
+    assert top == set(groups[:11]) and rest == groups[11:]
+
+
+def test_legend_buckets_small_groups_into_other(tmp_path):
+    ttl = tmp_path / "many.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/m#> .\n"
+                   + "".join(f"ex:i{i} a ex:C{i:02d} .\n" for i in range(13))
+                   + "ex:big1 a ex:C00 . ex:big2 a ex:C00 .\n", encoding="utf-8")
+    data = graph.build(load.load_files([ttl]), color_by="type")
+    page = render.render_html(data, title="m", pinned=False, labels={"node": True, "edge": True})
+    assert 'data-group="C00"' in page
+    assert "other (2 groups)" in page and 'data-groups="[&quot;C11&quot;, &quot;C12&quot;]"' in page
+    assert page.count('class="row grp"') == 12
+
+
+def test_group_counts_include_link_owners_in_file_mode(data):
+    counts = render.group_counts(data)
+    assert counts["library"] > counts["library-extra"] >= 1
 
 
 def test_group_names_are_html_escaped_in_the_legend(data):

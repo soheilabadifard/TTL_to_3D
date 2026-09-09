@@ -13,21 +13,56 @@ from __future__ import annotations
 import html as _html
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 VENDOR_JS = Path(__file__).parent / "vendor" / "fg3d-bundle.min.js"
 VIEWER_CSS = Path(__file__).parent / "viewer.css"
 VIEWER_JS = Path(__file__).parent / "viewer.js"
-# saturated-on-white categorical palette; cycles past twelve groups
+# saturated-on-white categorical palette
 PALETTE = ["#ca8a04", "#dc2626", "#2563eb", "#7c3aed", "#16a34a", "#0891b2",
            "#ea580c", "#db2777", "#4d7c0f", "#b45309", "#0f766e", "#111827"]
 UNKNOWN_COLOR = "#9ca3af"
+OTHER_COLOR = "#94a3b8"
+MAX_COLORED_GROUPS = 11   # past len(PALETTE) groups, only the largest keep a colour
 
 
-def assign_colors(groups) -> dict:
-    colors = {g: PALETTE[i % len(PALETTE)] for i, g in enumerate(g for g in groups if g != "?")}
+def group_counts(data: dict) -> dict:
+    """Nodes per group; in file mode a file also counts the links it asserts."""
+    counts = Counter(n["group"] for n in data["nodes"])
+    if data.get("color_by") == "file":
+        counts.update(l["group"] for l in data["links"] if l["group"])
+    return dict(counts)
+
+
+def rank_groups(groups, counts=None) -> tuple[set, list]:
+    """(groups that get their own colour, groups bucketed as "other")."""
+    counts = counts or {}
+    named = [g for g in groups if g != "?"]
+    if len(named) <= len(PALETTE):
+        return set(named), []
+    ranked = sorted(named, key=lambda g: (-counts.get(g, 0), g))
+    return set(ranked[:MAX_COLORED_GROUPS]), ranked[MAX_COLORED_GROUPS:]
+
+
+def assign_colors(groups, counts=None) -> dict:
+    top, rest = rank_groups(groups, counts)
+    colors = {g: PALETTE[i] for i, g in enumerate(sorted(top))}
+    colors.update({g: OTHER_COLOR for g in rest})
     colors["?"] = UNKNOWN_COLOR
     return colors
+
+
+def _legend(groups, colors, counts) -> str:
+    esc = lambda s: _html.escape(str(s), quote=True)
+    top, rest = rank_groups(groups, counts)
+    rows = [f'<div class="row grp" data-group="{esc(g)}"><span class="dot" '
+            f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>'
+            for g in groups if g in top or g == "?"]
+    if rest:
+        rows.append(f'<div class="row grp" data-groups="{esc(json.dumps(rest))}"><span class="dot" '
+                    f'style="background:{OTHER_COLOR}"></span>other ({len(rest)} groups)</div>')
+    return "".join(rows)
 
 
 def _bundle() -> str:
@@ -61,11 +96,9 @@ def fill(template: str, values: dict[str, str]) -> str:
 
 def render_html(data: dict, *, title: str, pinned: bool, labels: dict) -> str:
     esc = lambda s: _html.escape(str(s), quote=True)
-    colors = assign_colors(data["groups"])
-    legend = "".join(
-        f'<div class="row grp" data-group="{esc(g)}"><span class="dot" '
-        f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>'
-        for g in data["groups"])
+    counts = group_counts(data)
+    colors = assign_colors(data["groups"], counts)
+    legend = _legend(data["groups"], colors, counts)
     config = {"title": title, "colorBy": data.get("color_by", "file"),
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
                                                  "edge": bool(labels["edge"])}}

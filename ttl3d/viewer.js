@@ -208,10 +208,14 @@ function applyFilter() {
 }
 
 document.querySelectorAll('.row.grp').forEach(row => {
+  // a bucket row ("other") toggles every group it stands for
+  const members = row.dataset.groups ? JSON.parse(row.dataset.groups) : [row.dataset.group];
   row.addEventListener('click', () => {
-    const g = row.dataset.group;
-    if (activeGroups.has(g)) { activeGroups.delete(g); row.classList.remove('active'); }
-    else { activeGroups.add(g); row.classList.add('active'); }
+    if (members.some(g => activeGroups.has(g))) {
+      members.forEach(g => activeGroups.delete(g)); row.classList.remove('active');
+    } else {
+      members.forEach(g => activeGroups.add(g)); row.classList.add('active');
+    }
     applyFilter();
   });
 });
