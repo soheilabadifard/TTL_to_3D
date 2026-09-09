@@ -77,7 +77,9 @@ def resolve_terms(terms, ds: Dataset) -> set:
     """Turn 'prefix:local', full IRIs, or '<...>'-wrapped IRIs into URIRefs using the
     dataset's bindings. Angle brackets are the Turtle convention for "this is a full
     IRI, not a CURIE" -- needed for schemes like urn: or mailto: that have no "://"."""
-    by_prefix = {prefix: ns for ns, prefix in ds.prefixes.items()}
+    by_prefix: dict = {}
+    for ns, prefix in ds.prefixes.items():
+        by_prefix.setdefault(prefix, ns)
     out = set()
     for term in terms:
         if term.startswith("<") and term.endswith(">"):
@@ -164,11 +166,10 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
             elif isinstance(o, URIRef) and p in attribute and p != RDF.type and p not in SOURCE_PREDS:
                 props[local(p)].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
-        sources = sorted(
-            ({"label": labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s),
-              "url": src_url.get(s)}
-             for p in SOURCE_PREDS for s in g.objects(n, p) if isinstance(s, URIRef)),
-            key=lambda d: d["label"])
+        sources = [{"label": label, "url": src_url.get(s)}
+                   for label, s in sorted(
+                       (labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s), s)
+                       for p in SOURCE_PREDS for s in g.objects(n, p) if isinstance(s, URIRef))]
         ns = namespace_of(n)
         nodes.append({
             "id": str(n), "label": labels[n], "types": types,

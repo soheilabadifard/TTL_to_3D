@@ -95,6 +95,9 @@ def test_legend_buckets_small_groups_into_other(tmp_path):
     assert 'data-group="C00"' in page
     assert "other (2 groups)" in page and 'data-groups="[&quot;C11&quot;, &quot;C12&quot;]"' in page
     assert page.count('class="row grp"') == 12
+    import html as _html
+    attr = page.split('data-groups="', 1)[1].split('"', 1)[0]
+    assert json.loads(_html.unescape(attr)) == ["C11", "C12"]
 
 
 def test_group_counts_include_link_owners_in_file_mode(data):

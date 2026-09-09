@@ -26,7 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--title", help="page title (default: first file stem)")
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
-                        "untagged literals rank next, other languages become synonyms")
+                        "untagged literals rank next, other languages become synonyms"
+                        "; matched exactly (en does not select en-GB)")
     p.add_argument("--type-links", action="store_true",
                    help="draw rdf:type as an edge from each instance to its class (default: card only)")
     p.add_argument("--attribute-preds", action="append", default=[], metavar="PRED[,PRED...]",

@@ -15,7 +15,7 @@ def test_cli_writes_the_page_and_reports_what_it_did(tmp_path, library, library_
     out = tmp_path / "lib.html"
     rc = cli.main([str(library), str(library_extra), "-o", str(out), "--title", "Lib"])
     assert rc == 0
-    html = out.read_text()
+    html = out.read_text(encoding="utf-8")
     assert "<title>Lib</title>" in html and '"pinned": true' in html
     printed = capsys.readouterr().out
     assert "12 nodes" in printed and "6 links" in printed and "stress" in printed
@@ -30,19 +30,19 @@ def test_cli_default_output_is_named_after_the_first_file(tmp_path, library, mon
 def test_cli_color_by_type_puts_types_in_the_legend(tmp_path, library):
     out = tmp_path / "t.html"
     cli.main([str(library), "-o", str(out), "--color-by", "type"])
-    assert 'data-group="Book"' in out.read_text()
+    assert 'data-group="Book"' in out.read_text(encoding="utf-8")
 
 
 def test_cli_force_layout_leaves_nodes_unpinned(tmp_path, library):
     out = tmp_path / "f.html"
     cli.main([str(library), "-o", str(out), "--layout", "force"])
-    assert '"pinned": false' in out.read_text()
+    assert '"pinned": false' in out.read_text(encoding="utf-8")
 
 
 def test_cli_hover_labels_disable_both_label_layers(tmp_path, library):
     out = tmp_path / "h.html"
     cli.main([str(library), "-o", str(out), "--labels", "hover"])
-    assert '"node": false' in out.read_text() and '"edge": false' in out.read_text()
+    assert '"node": false' in out.read_text(encoding="utf-8") and '"edge": false' in out.read_text(encoding="utf-8")
 
 
 def test_cli_rejects_an_unknown_color_key(library):
@@ -142,6 +142,7 @@ def test_cli_format_flag(tmp_path, library):
     weird = tmp_path / "data.txt"
     weird.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
     out = tmp_path / "f.html"
+    assert cli.main([str(weird), "-o", str(out), "--format", "xml"]) == 1      # forced parser rejects Turtle
     assert cli.main([str(weird), "-o", str(out), "--format", "turtle"]) == 0 and out.exists()
 
 

@@ -53,10 +53,10 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed 3D Kamada-Kawai position; `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
 | `--title` | text | Page title. Default: the first file's stem. |
-| `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. |
+| `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. Matched exactly: `--lang en` does not select `@en-GB`. |
 | `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, ...). Default: guess from the extension, then try Turtle. |
 | `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
-| `--attribute-preds` | `prefix:local,...` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable. |
+| `--attribute-preds` | `prefix:local`, full IRI, or `<urn:...>` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable; wrap a URN or mailto in angle brackets. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 `.owl`, `.jsonld`, ...) through rdflib.
