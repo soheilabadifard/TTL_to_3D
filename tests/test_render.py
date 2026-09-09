@@ -1,4 +1,5 @@
 """ttl3d.render: the self-contained HTML page and the behaviors settled with the user."""
+import shutil, subprocess
 import pytest
 from ttl3d import load, graph, render
 
@@ -76,3 +77,22 @@ def test_group_names_are_html_escaped_in_the_legend(data):
 def test_write_html_creates_parent_directories(tmp_path):
     out = render.write_html("<p>x</p>", tmp_path / "deep" / "er" / "page.html")
     assert out.read_text() == "<p>x</p>"
+
+
+def test_viewer_assets_are_files_and_are_inlined(html):
+    assert render.VIEWER_CSS.name == "viewer.css" and render.VIEWER_JS.name == "viewer.js"
+    css = render.VIEWER_CSS.read_text(encoding="utf-8")
+    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    assert css.strip() and css in html
+    assert js.startswith("const DATA = __DATA__;") and "__DATA__" not in html
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_viewer_js_is_valid_javascript(tmp_path):
+    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    for key in ("__DATA__", "__COLORS__", "__CONFIG__"):
+        js = js.replace(key, "{}")
+    probe = tmp_path / "viewer-probe.js"
+    probe.write_text(js, encoding="utf-8")
+    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr

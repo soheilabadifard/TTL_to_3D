@@ -36,7 +36,7 @@ ttl3d = "ttl3d.cli:main"
 include = ["ttl3d*"]
 
 [tool.setuptools.package-data]
-ttl3d = ["vendor/*.js", "vendor/*.md"]
+ttl3d = ["vendor/*.js", "vendor/*.md", "viewer.js", "viewer.css"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
