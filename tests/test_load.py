@@ -48,3 +48,18 @@ def test_malformed_file_raises_load_error_naming_the_file(tmp_path):
         load.load_files([bad])
     assert "bad.ttl" in str(e.value)
     assert "\n" not in str(e.value)
+
+
+def test_turtle_saved_with_an_owl_extension_still_loads(tmp_path, library):
+    owl = tmp_path / "onto.owl"
+    owl.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
+    assert len(load.load_files([owl]).merged) == len(load.load_files([library]).merged)
+
+
+def test_explicit_format_wins_over_the_extension(tmp_path, library):
+    weird = tmp_path / "data.txt"
+    weird.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
+    assert len(load.load_files([weird], fmt="turtle").merged) > 0
+    with pytest.raises(load.LoadError) as e:
+        load.load_files([weird], fmt="xml")
+    assert "as xml" in str(e.value)

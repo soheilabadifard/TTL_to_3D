@@ -25,6 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
                         "untagged literals rank next, other languages become synonyms")
+    p.add_argument("--format", metavar="NAME",
+                   help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
+                        "default: guess from the extension, then try turtle")
     p.add_argument("--version", action="version", version=f"ttl3d {__version__}")
     return p
 
@@ -42,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     if out.resolve() in {Path(f).resolve() for f in args.files}:
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
-        ds = load.load_files(args.files)
+        ds = load.load_files(args.files, fmt=args.format)
     except (OSError, load.LoadError) as e:
         return _fail(e)
     data = graph.build(ds, color_by=args.color_by, lang=args.lang)

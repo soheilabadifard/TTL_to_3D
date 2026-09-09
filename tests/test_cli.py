@@ -134,3 +134,10 @@ def test_cli_lang_picks_the_label_language(tmp_path):
     assert '"label": "Zebra"' in out.read_text(encoding="utf-8")
     cli.main([str(ttl), "-o", str(out), "--lang", "de"])
     assert '"label": "Antilope"' in out.read_text(encoding="utf-8")
+
+
+def test_cli_format_flag(tmp_path, library):
+    weird = tmp_path / "data.txt"
+    weird.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
+    out = tmp_path / "f.html"
+    assert cli.main([str(weird), "-o", str(out), "--format", "turtle"]) == 0 and out.exists()

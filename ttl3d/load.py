@@ -31,20 +31,27 @@ def _unique_key(stem: str, taken: dict) -> str:
     return key
 
 
-def _parse(f: Path) -> Graph:
+def _parse(f: Path, fmt: str | None = None) -> Graph:
+    """Parse one file. Without an explicit format the extension decides; if that
+    parser rejects the file, try Turtle once (Turtle saved as .owl is common)."""
     g = Graph()
-    fmt = guess_format(str(f)) or "turtle"
+    guessed = fmt or guess_format(str(f)) or "turtle"
     try:
-        g.parse(f, format=fmt)
+        g.parse(f, format=guessed)
     except Exception as e:  # every rdflib parser plugin raises its own class
+        if fmt is None and guessed != "turtle":
+            try:
+                return _parse(f, "turtle")
+            except LoadError:
+                pass
         # collapse whitespace: rdflib's BadSyntax (and others) embed literal
         # newlines, and the message must stay on one stderr line
         detail = " ".join(str(e).split())
-        raise LoadError(f"{f}: cannot parse as {fmt}: {detail}") from e
+        raise LoadError(f"{f}: cannot parse as {guessed}: {detail}") from e
     return g
 
 
-def load_files(paths: Iterable[str | Path]) -> Dataset:
+def load_files(paths: Iterable[str | Path], fmt: str | None = None) -> Dataset:
     files = [Path(p) for p in paths]
     graphs: dict[str, Graph] = {}
     merged = Graph()
@@ -52,7 +59,7 @@ def load_files(paths: Iterable[str | Path]) -> Dataset:
     for f in files:
         if not f.is_file():
             raise FileNotFoundError(f)
-        g = _parse(f)
+        g = _parse(f, fmt)
         graphs[_unique_key(f.stem, graphs)] = g
         for triple in g:
             merged.add(triple)
