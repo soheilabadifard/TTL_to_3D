@@ -1,7 +1,10 @@
 """Command line entry point: ttl3d FILE [FILE ...] [-o OUT] [--color-by KEY] ..."""
 from __future__ import annotations
+
 import argparse
+import sys
 from pathlib import Path
+
 from . import __version__, graph, layout, load, render
 
 
@@ -21,25 +24,57 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"permanent labels (auto: nodes up to {layout.LABEL_MAX_NODES}, "
                         f"edges up to {layout.LABEL_MAX_LINKS}); hover = tooltips only")
     p.add_argument("--title", help="page title (default: first file stem)")
+    p.add_argument("--lang", default="en",
+                   help="preferred language tag for labels and definitions (default: en); "
+                        "untagged literals rank next, other languages become synonyms"
+                        "; matched exactly (en does not select en-GB)")
+    p.add_argument("--type-links", action="store_true",
+                   help="draw rdf:type as an edge from each instance to its class (default: card only)")
+    p.add_argument("--attribute-preds", action="append", default=[], metavar="PRED[,PRED...]",
+                   help="predicates to show on the card instead of drawing, as prefix:local, full IRIs, "
+                        "or <urn:...> in angle brackets (e.g. foaf:homepage,rdfs:seeAlso); repeatable")
+    p.add_argument("--format", metavar="NAME",
+                   help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
+                        "default: guess from the extension, then try turtle")
     p.add_argument("--version", action="version", version=f"ttl3d {__version__}")
     return p
 
 
+def _fail(problem) -> int:
+    """Print one line to stderr and return the exit code; `problem` is an exception or a string."""
+    print(f"ttl3d: error: {problem}", file=sys.stderr)
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    ds = load.load_files(args.files)
-    data = graph.build(ds, color_by=args.color_by)
+    first = Path(args.files[0]).stem
+    out = Path(args.out) if args.out else Path.cwd() / f"{first}-3d.html"
+    if out.resolve() in {Path(f).resolve() for f in args.files}:
+        return _fail(f"output {out} is also an input file; pick another -o path")
+    try:
+        ds = load.load_files(args.files, fmt=args.format)
+        extra = graph.resolve_terms([t for arg in args.attribute_preds for t in arg.split(",") if t],
+                                    ds)
+    except (OSError, ValueError) as e:      # LoadError is a ValueError
+        return _fail(e)
+    data = graph.build(ds, color_by=args.color_by, lang=args.lang,
+                       type_links=args.type_links, attribute_preds=extra)
     mode = layout.choose_layout(len(data["nodes"]), args.layout)
     if mode == "stress":
+        notice = layout.stress_notice(len(data["nodes"]))
+        if notice:
+            print(notice, file=sys.stderr)
         pos = layout.stress_positions([n["id"] for n in data["nodes"]], data["links"])
         for n in data["nodes"]:
             n["x"], n["y"], n["z"] = pos[n["id"]]
     labels = layout.choose_labels(len(data["nodes"]), len(data["links"]), args.labels)
-    first = Path(args.files[0]).stem
     html = render.render_html(data, title=args.title or first,
                               pinned=(mode == "stress"), labels=labels)
-    out = Path(args.out) if args.out else Path.cwd() / f"{first}-3d.html"
-    render.write_html(html, out)
+    try:
+        render.write_html(html, out)
+    except OSError as e:
+        return _fail(e)
     shown = "+".join(k for k, v in labels.items() if v) or "hover only"
     print(f'{len(data["nodes"])} nodes, {len(data["links"])} links -> {out} '
           f'(layout: {mode}, labels: {shown})')

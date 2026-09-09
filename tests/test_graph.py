@@ -1,12 +1,18 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
+from pathlib import Path
+
 import pytest
-from ttl3d import load, graph
+from rdflib import URIRef
+
+from ttl3d import graph, load
+
+REPO = Path(__file__).resolve().parents[1]
 
 EX = "http://example.org/library#"
 
 
-def build(*files, color_by="file"):
-    return graph.build(load.load_files(files), color_by=color_by)
+def build(*files, **kw):
+    return graph.build(load.load_files(files), **kw)
 
 
 def ids(data):
@@ -123,3 +129,149 @@ def test_link_group_follows_the_asserting_file_only_in_file_mode(library, librar
 def test_invalid_color_by_is_rejected(library):
     with pytest.raises(ValueError):
         build(library, color_by="colour")
+
+
+def _by_local(data):
+    return {n["id"].rsplit("#", 1)[1]: n for n in data["nodes"]}
+
+
+def test_label_prefers_the_requested_language_then_untagged(tmp_path):
+    ttl = tmp_path / "lang.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/l#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   'ex:z rdfs:label "Zebra"@en, "Antilope"@de, "Cebra"@es .\n'
+                   'ex:u rdfs:label "Untagged", "Getaggt"@de .\n'
+                   'ex:s rdfs:label "Sol"@en, "Sol"@la .\n', encoding="utf-8")
+    en = _by_local(build(ttl, lang="en"))
+    assert en["z"]["label"] == "Zebra" and en["z"]["alt"] == ["Antilope", "Cebra"]
+    assert en["u"]["label"] == "Untagged" and en["u"]["alt"] == ["Getaggt"]
+    assert en["s"]["label"] == "Sol" and en["s"]["alt"] == []
+    de = _by_local(build(ttl, lang="de"))
+    assert de["z"]["label"] == "Antilope" and de["u"]["label"] == "Getaggt"
+    none = _by_local(build(ttl))
+    assert none["u"]["label"] == "Untagged" and none["z"]["label"] == "Antilope"
+
+
+def test_losing_definition_literals_stay_on_the_card(tmp_path):
+    ttl = tmp_path / "def.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\n"
+                   'ex:a skos:definition "Def." ; rdfs:comment "Comment." .\n', encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["definition"] == "Def." and a["props"] == {"comment": ["Comment."]}
+
+
+def test_a_losing_definition_with_the_same_text_is_still_kept(tmp_path):
+    ttl = tmp_path / "same.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\n"
+                   'ex:a skos:definition "Same." ; rdfs:comment "Same." .\n', encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["definition"] == "Same." and a["props"] == {"comment": ["Same."]}
+
+
+def test_literal_sources_go_to_properties_not_the_sources_list(tmp_path):
+    ttl = tmp_path / "src.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/s#> .\n"
+                   "@prefix dcterms: <http://purl.org/dc/terms/> .\n"
+                   "@prefix prov: <http://www.w3.org/ns/prov#> .\n"
+                   'ex:a dcterms:source "NASA fact sheets, 2020/21" ; prov:wasDerivedFrom ex:src .\n',
+                   encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["sources"] == [{"label": "src", "url": None}]
+    assert a["props"] == {"source": ["NASA fact sheets, 2020/21"]}
+
+
+def test_empty_default_prefix_is_a_bound_namespace(tmp_path):
+    ttl = tmp_path / "default.ttl"
+    ttl.write_text("@prefix : <http://example.org/default#> .\n:a :p :b .\n", encoding="utf-8")
+    data = build(ttl, color_by="namespace")
+    assert data["groups"] == [":"] and {n["ns"] for n in data["nodes"]} == {":"}
+
+
+def test_inverse_pairs_collapse_into_one_bidirectional_link(tmp_path):
+    ttl = tmp_path / "inv.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/i#> .\n"
+                   "ex:earth ex:hasMoon ex:luna .\nex:luna ex:orbits ex:earth .\n", encoding="utf-8")
+    data = build(ttl)
+    assert len(data["links"]) == 1
+    link = data["links"][0]
+    assert link["source"].endswith("#earth") and link["target"].endswith("#luna")
+    assert link["predicates"] == ["hasMoon"] and link["reverse"] == ["orbits"]
+
+
+def test_a_link_only_asserted_backwards_still_points_forwards(tmp_path):
+    ttl = tmp_path / "back.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/i#> .\nex:zeta ex:p ex:alpha .\n", encoding="utf-8")
+    link = build(ttl)["links"][0]
+    assert link["source"].endswith("#zeta") and link["predicates"] == ["p"] and link["reverse"] == []
+
+
+def test_one_way_links_have_an_empty_reverse_list(library):
+    assert all(l["reverse"] == [] for l in build(library)["links"])
+
+
+def test_demo_has_no_stacked_inverse_links():
+    data = graph.build(load.load_files([REPO / "examples" / "solar-system.ttl",
+                                        REPO / "examples" / "solar-system-missions.ttl"]))
+    pairs = {(l["source"], l["target"]) for l in data["links"]}
+    assert not any((t, s) in pairs for s, t in pairs)
+    assert sum(1 for l in data["links"] if l["reverse"]) == 12
+
+
+def test_type_links_connect_instances_to_their_classes(library):
+    data = build(library, type_links=True)
+    assert ("Herbert", "type", "Author") in edges(data)
+    assert ("Book", "type", "Class") not in edges(data)      # owl:Class is reserved vocabulary
+
+
+def test_attribute_preds_demote_a_relation_to_the_card(tmp_path):
+    ttl = tmp_path / "attr.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/a#> .\n"
+                   "@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n"
+                   "ex:alice foaf:homepage <https://alice.example/> ; ex:knows ex:bob .\n",
+                   encoding="utf-8")
+    ds = load.load_files([ttl])
+    data = graph.build(ds, attribute_preds=graph.resolve_terms(["foaf:homepage"], ds))
+    assert [l["predicates"] for l in data["links"]] == [["knows"]]
+    assert not any(n["id"].startswith("https://alice.example") for n in data["nodes"])
+
+
+def test_resolve_terms_expands_curies_and_rejects_unknown_prefixes(library):
+    ds = load.load_files([library])
+    assert graph.resolve_terms(["ex:wrote", "http://example.org/x#p"], ds) == {
+        URIRef("http://example.org/library#wrote"), URIRef("http://example.org/x#p")}
+    with pytest.raises(ValueError):
+        graph.resolve_terms(["nope:thing"], ds)
+
+
+def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(library):
+    ds = load.load_files([library])
+    assert graph.resolve_terms(["<urn:isbn:0451450523>", "<mailto:x@example.org>"], ds) == {
+        URIRef("urn:isbn:0451450523"), URIRef("mailto:x@example.org")}
+    with pytest.raises(ValueError) as e:
+        graph.resolve_terms(["urn:isbn:0451450523"], ds)
+    assert "<urn:isbn:0451450523>" in str(e.value)
+
+
+def test_iri_valued_attribute_predicates_show_on_the_card(tmp_path):
+    ttl = tmp_path / "iri.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/c#> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                   'ex:onto rdfs:label "The onto" .\n'
+                   "ex:a rdfs:isDefinedBy ex:onto ; owl:priorVersion <http://example.org/c/v1> ; ex:p ex:b .\n",
+                   encoding="utf-8")
+    a = _by_local(build(ttl))["a"]
+    assert a["props"] == {"isDefinedBy": ["The onto"], "priorVersion": ["http://example.org/c/v1"]}
+    assert [l["predicates"] for l in build(ttl)["links"]] == [["p"]]
+
+
+def test_a_link_asserted_by_two_files_lists_both(tmp_path):
+    for name in ("first", "second"):
+        (tmp_path / f"{name}.ttl").write_text(
+            "@prefix ex: <http://example.org/f#> .\nex:a ex:p ex:b .\n", encoding="utf-8")
+    data = build(tmp_path / "first.ttl", tmp_path / "second.ttl")
+    assert data["links"][0]["files"] == ["first", "second"] and data["links"][0]["group"] == "first"

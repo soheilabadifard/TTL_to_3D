@@ -53,6 +53,10 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed 3D Kamada-Kawai position; `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
 | `--title` | text | Page title. Default: the first file's stem. |
+| `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. Matched exactly: `--lang en` does not select `@en-GB`. |
+| `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, ...). Default: guess from the extension, then try Turtle. |
+| `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
+| `--attribute-preds` | `prefix:local`, full IRI, or `<urn:...>` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable; wrap a URN or mailto in angle brackets. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 `.owl`, `.jsonld`, ...) through rdflib.
@@ -63,15 +67,17 @@ Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
   link, except IRIs of the RDF, RDFS, OWL and XSD vocabularies and ontology
   headers (`owl:Ontology`). Blank nodes are skipped.
 - A link is an IRI-to-IRI triple whose predicate is a relation. `rdf:type`,
-  `owl:imports`, `rdfs:isDefinedBy`, `prov:wasDerivedFrom` and `dcterms:source`
-  describe the node instead and go to its card. Parallel edges collapse into
-  one link listing every predicate.
+  `owl:imports`, `owl:versionIRI`, `owl:priorVersion`, `rdfs:isDefinedBy`,
+  `prov:wasDerivedFrom` and `dcterms:source` describe the node instead and go
+  to its card. Parallel edges collapse into one link listing every predicate.
 - Label: `rdfs:label`, else `skos:prefLabel`, else the local name.
   Definition: `skos:definition`, else `rdfs:comment`, else `dcterms:description`.
   Every other literal lands in the card's property table.
 - Each node remembers the file that first declares it; each link remembers the
   files asserting it. A file that only adds edges between other files' nodes
   still owns something visible.
+- An edge asserted in both directions (`:Luna :orbits :Earth` and `:Earth :hasMoon :Luna`) is one link labelled `orbits ⇄ hasMoon`, without an arrowhead.
+- Labels follow `--lang`: the requested language first, then untagged literals, then anything else; every other label value becomes a synonym on the card, and a `rdfs:comment` that loses to a `skos:definition` still appears in the property table.
 
 ## In the page
 
@@ -85,6 +91,7 @@ Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 - "Free-float physics" releases pinned nodes into the live force layout and
   pins them back where they were.
 - No fog: white fog made distant nodes vanish on zoom-out.
+- Past twelve groups only the eleven largest keep a colour; the rest share one grey "other" row that filters them together.
 
 ## Scale
 
@@ -104,6 +111,7 @@ Force the behaviour you want with `--layout` and `--labels`.
 - Blank nodes are skipped, so OWL restrictions and RDF lists do not appear.
 - No reasoning: only asserted triples are drawn.
 - One page holds one graph; there is no incremental loading.
+- The stress layout is quadratic: `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
 
 ## Development
 
@@ -111,10 +119,13 @@ Force the behaviour you want with `--layout` and `--labels`.
 python -m pytest -q
 ```
 
-The tests cover the loader, the node and link rules, the layout thresholds,
-the generated page, and the command line. The vendored JavaScript in
-`ttl3d/vendor/` bundles 3d-force-graph, three-spritetext and one shared
-three.js; `VENDOR.md` there has the rebuild recipe.
+The tests cover the loader, the node and link rules, the layout, the generated page, and the
+command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css` and `ttl3d/viewer.js`
+and are inlined into every page; when `node` is installed the suite syntax-checks the
+JavaScript. `pip install -e .[browser] && playwright install chromium` enables one headless
+browser test that loads the demo page and asserts zero console errors. The vendored JavaScript
+in `ttl3d/vendor/` bundles 3d-force-graph, three-spritetext and one shared three.js;
+`VENDOR.md` there has the rebuild recipe and `LICENSES.md` the upstream notices.
 
 ## License
 

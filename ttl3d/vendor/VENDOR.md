@@ -18,3 +18,9 @@ npx esbuild entry.js --bundle --minify --format=iife --outfile=fg3d-bundle.min.j
 
 The viewer needs all three globals; `tests/test_bundle.py` checks them so a
 rebuild that drops one fails the suite instead of breaking pages silently.
+
+Pinned upstream versions in the shipped bundle: 3d-force-graph 1.77.0,
+three-spritetext 1.10.0, three.js as resolved by those two on 2026-09-08
+(the bundle's tail carries the three.js license banner with its version);
+build with esbuild 0.24 or later. Copyright notices for all three libraries
+are in `LICENSES.md` next to this file, as the MIT license requires.

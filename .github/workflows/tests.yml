@@ -6,14 +6,36 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e . pytest
+      - run: pip install -e .[test] ruff
+      - run: ruff check ttl3d tests
       - run: python -m pytest -q
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --wheel
+      - run: pip install dist/*.whl
+      - name: the installed package carries its viewer and vendor files and renders the demo
+        run: |
+          cd /tmp
+          python -c "import ttl3d, pathlib; p = pathlib.Path(ttl3d.__file__).parent; assert (p/'viewer.js').exists() and (p/'viewer.css').exists() and (p/'vendor'/'fg3d-bundle.min.js').exists()"
+          ttl3d "$GITHUB_WORKSPACE/examples/solar-system.ttl" -o /tmp/solar.html
+          test -s /tmp/solar.html
