@@ -243,3 +243,12 @@ def test_resolve_terms_expands_curies_and_rejects_unknown_prefixes(library):
         URIRef("http://example.org/library#wrote"), URIRef("http://example.org/x#p")}
     with pytest.raises(ValueError):
         graph.resolve_terms(["nope:thing"], ds)
+
+
+def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(library):
+    ds = load.load_files([library])
+    assert graph.resolve_terms(["<urn:isbn:0451450523>", "<mailto:x@example.org>"], ds) == {
+        URIRef("urn:isbn:0451450523"), URIRef("mailto:x@example.org")}
+    with pytest.raises(ValueError) as e:
+        graph.resolve_terms(["urn:isbn:0451450523"], ds)
+    assert "<urn:isbn:0451450523>" in str(e.value)

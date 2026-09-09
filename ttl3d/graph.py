@@ -71,16 +71,22 @@ def _prefix(ds: Dataset, ns: str) -> str:
 
 
 def resolve_terms(terms, ds: Dataset) -> set:
-    """Turn 'prefix:local' or full IRIs into URIRefs using the dataset's bindings."""
+    """Turn 'prefix:local', full IRIs, or '<...>'-wrapped IRIs into URIRefs using the
+    dataset's bindings. Angle brackets are the Turtle convention for "this is a full
+    IRI, not a CURIE" -- needed for schemes like urn: or mailto: that have no "://"."""
     by_prefix = {prefix: ns for ns, prefix in ds.prefixes.items()}
     out = set()
     for term in terms:
+        if term.startswith("<") and term.endswith(">"):
+            out.add(URIRef(term[1:-1]))
+            continue
         if "://" in term:
             out.add(URIRef(term))
             continue
         prefix, _, name = term.partition(":")
         if prefix not in by_prefix:
-            raise ValueError(f"unknown prefix in {term!r}; bind it in an input file or use a full IRI")
+            raise ValueError(f"unknown prefix in {term!r}; bind it in an input file, "
+                             f"or write the full IRI as <{term}>")
         out.add(URIRef(by_prefix[prefix] + name))
     return out
 

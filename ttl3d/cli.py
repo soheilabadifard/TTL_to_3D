@@ -28,8 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--type-links", action="store_true",
                    help="draw rdf:type as an edge from each instance to its class (default: card only)")
     p.add_argument("--attribute-preds", action="append", default=[], metavar="PRED[,PRED...]",
-                   help="predicates to show on the card instead of drawing, as prefix:local or full IRIs "
-                        "(e.g. foaf:homepage,rdfs:seeAlso); repeatable")
+                   help="predicates to show on the card instead of drawing, as prefix:local, full IRIs, "
+                        "or <urn:...> in angle brackets (e.g. foaf:homepage,rdfs:seeAlso); repeatable")
     p.add_argument("--format", metavar="NAME",
                    help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
                         "default: guess from the extension, then try turtle")
