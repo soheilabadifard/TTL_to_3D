@@ -116,9 +116,7 @@ def test_components_never_come_closer_than_the_island_gap(dim):
 
 def test_stress_notice_is_silent_for_small_graphs_and_warns_past_the_auto_limit():
     assert layout.stress_notice(layout.PROGRESS_MIN_NODES) is None
-    # Old test name compatibility: this now checks for the new text with 3D and 2D
-    notice = layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
-    assert notice is not None and "stress layout" in notice
+    assert "stress layout" in layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
     big = layout.stress_notice(layout.STRESS_MAX_NODES + 1)
     assert "--layout force" in big
 
