@@ -8,9 +8,30 @@ from pathlib import Path
 
 import pytest
 
-from ttl3d import layout
+from ttl3d import graph, layout, load
 
 REPO = Path(__file__).resolve().parents[1]
+
+GOLDEN_3D = {
+    "http://example.org/library#Author": [3.94, 22.44, 19.52],
+    "http://example.org/library#Book": [-11.32, -66.7, -59.34],
+    "http://example.org/library#Dune": [127.5, 59.34, -4.39],
+    "http://example.org/library#Herbert": [126.7, 0.0, 4.39],
+    "http://example.org/library#Person": [10.3, 66.65, 59.59],
+    "http://example.org/library#Prefonly": [187.5, 0.0, 0.0],
+    "http://example.org/library#Unlabeled": [247.5, 0.0, 0.0],
+    "http://example.org/library#Weird": [307.5, 0.0, 0.0],
+    "http://example.org/library#pages": [367.5, 0.0, 0.0],
+    "http://example.org/library#wrote": [-2.92, -22.39, -19.76],
+}
+
+
+def test_three_d_positions_of_the_library_fixture_are_unchanged(library):
+    d = graph.build(load.load_files([library]))
+    pos = layout.stress_positions([n["id"] for n in d["nodes"]], d["links"])
+    assert pos.keys() == GOLDEN_3D.keys()
+    for node, xyz in GOLDEN_3D.items():   # slack for other scipy/BLAS builds, far below any real change
+        assert pos[node] == pytest.approx(xyz, abs=0.05), node
 
 
 def test_auto_layout_is_stress_up_to_the_threshold_then_force():
@@ -78,13 +99,15 @@ def test_stress_positions_are_reproducible():
     assert layout.stress_positions(ids, links) == layout.stress_positions(ids, links)
 
 
-def test_components_never_come_closer_than_the_island_gap():
+@pytest.mark.parametrize("dim", [3, 2])
+def test_components_never_come_closer_than_the_island_gap(dim):
     ids, links = ["m1", "m2"], [{"source": "m1", "target": "m2"}]
     for i in range(12):
         chain = [f"i{i}n{j}" for j in range(4)]
         ids += chain
         links += [{"source": a, "target": b} for a, b in itertools.pairwise(chain)]
-    pos = layout.stress_positions(ids, links)
+    pos = layout.stress_positions(ids, links, dim=dim)
+    assert all(len(p) == dim for p in pos.values())
     component = {n: n.split("n")[0] if n.startswith("i") else "m" for n in ids}
     closest = min(math.dist(pos[a], pos[b]) for a in ids for b in ids
                   if component[a] != component[b])
@@ -93,19 +116,22 @@ def test_components_never_come_closer_than_the_island_gap():
 
 def test_stress_notice_is_silent_for_small_graphs_and_warns_past_the_auto_limit():
     assert layout.stress_notice(layout.PROGRESS_MIN_NODES) is None
-    assert "stress layout" in layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
+    # Old test name compatibility: this now checks for the new text with 3D and 2D
+    notice = layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
+    assert notice is not None and "stress layout" in notice
     big = layout.stress_notice(layout.STRESS_MAX_NODES + 1)
     assert "--layout force" in big
 
 
-def test_layout_is_identical_across_processes_with_different_hash_seeds():
+@pytest.mark.parametrize("dim", [3, 2])
+def test_layout_is_identical_across_processes_with_different_hash_seeds(dim):
     code = (
         "import json\n"
         "from ttl3d import layout\n"
         "ids = [f'n{i}' for i in range(30)]\n"
         "links = [{'source': f'n{i}', 'target': f'n{i + 1}'} for i in range(9)]\n"
         "links += [{'source': f'n{i}', 'target': f'n{i + 1}'} for i in range(10, 29) if i % 3 != 0]\n"
-        "print(json.dumps(layout.stress_positions(ids, links), sort_keys=True))\n")
+        f"print(json.dumps(layout.stress_positions(ids, links, dim={dim}), sort_keys=True))\n")
     outs = []
     for seed in ("1", "2"):
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO,
@@ -113,3 +139,30 @@ def test_layout_is_identical_across_processes_with_different_hash_seeds():
         assert r.returncode == 0, r.stderr
         outs.append(r.stdout)
     assert outs[0] == outs[1]
+
+
+def test_stress_positions_in_two_dimensions_are_flat_and_reproducible():
+    ids = [f"n{i}" for i in range(8)]
+    links = [{"source": f"n{i}", "target": f"n{i + 1}"} for i in range(7)]
+    pos = layout.stress_positions(ids, links, dim=2)
+    assert set(pos) == set(ids) and all(len(p) == 2 for p in pos.values())
+    assert pos == layout.stress_positions(ids, links, dim=2)
+    assert len(layout.stress_positions(ids, links)["n0"]) == 3      # the default stays 3-D
+    assert all(len(p) == 2 for p in layout.stress_positions(["x", "y"], [], dim=2).values())
+
+
+def test_lone_node_in_two_dimensions_sits_at_the_origin():
+    assert layout.stress_positions(["a"], [{"source": "a", "target": "a"}], dim=2) == {"a": [0.0, 0.0]}
+
+
+def test_islands_are_parked_beyond_the_main_body_in_two_dimensions():
+    ids = ["a", "b", "c", "d", "e"]
+    links = [{"source": "a", "target": "b"}, {"source": "b", "target": "c"},
+             {"source": "d", "target": "e"}]
+    pos = layout.stress_positions(ids, links, dim=2)
+    reach = max(abs(c) for n in ("a", "b", "c") for c in pos[n])
+    assert min(pos["d"][0], pos["e"][0]) >= reach + layout.ISLAND_GAP - 1e-6
+
+
+def test_stress_notice_mentions_both_layouts():
+    assert "3D and 2D" in layout.stress_notice(layout.PROGRESS_MIN_NODES + 1)
