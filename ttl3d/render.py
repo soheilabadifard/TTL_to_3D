@@ -22,6 +22,7 @@ VENDOR_JS = Path(__file__).parent / "vendor" / "fg-bundle.min.js"
 VIEWER_CSS = Path(__file__).parent / "viewer.css"
 VIEWER_JS = Path(__file__).parent / "viewer.js"          # shared app (already there)
 VIEWER_3D_JS = Path(__file__).parent / "viewer-3d.js"    # one renderer file per view, appended after it
+VIEWER_2D_JS = Path(__file__).parent / "viewer-2d.js"
 # saturated-on-white categorical palette
 PALETTE = ["#ca8a04", "#dc2626", "#2563eb", "#7c3aed", "#16a34a", "#0891b2",
            "#ea580c", "#db2777", "#4d7c0f", "#b45309", "#0f766e", "#111827"]
@@ -103,7 +104,7 @@ def viewer_source() -> str:
     renderer file per view. The renderer files hold function declarations only, so the
     shared top-level code can call them through hoisting; the page and the JavaScript
     syntax test both go through here so they never disagree on the order."""
-    return "\n".join(_read(p) for p in (VIEWER_JS, VIEWER_3D_JS))
+    return "\n".join(_read(p) for p in (VIEWER_JS, VIEWER_3D_JS, VIEWER_2D_JS))
 
 
 def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str = "3d") -> str:
@@ -147,6 +148,9 @@ __CSS__</style>
   <div class="sub">__COUNTS__ · colored by __COLORBY__</div>
   __LEGEND__
   <input id="q" placeholder="search labels…" autocomplete="off">
+  <div class="row views">view
+    <label><input type="radio" name="view" value="3d"> 3D</label>
+    <label><input type="radio" name="view" value="2d"> 2D</label></div>
   <label class="tog"><input type="checkbox" id="nodelabels"> node labels</label>
   <label class="tog"><input type="checkbox" id="edgelabels"> edge relation labels</label>
   <label class="tog"><input type="checkbox" id="physics"> free-float physics

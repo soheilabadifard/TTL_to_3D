@@ -44,6 +44,7 @@ const tooltip = n => `<b>${esc(n.label)}</b><br>${esc(n.types.join(', ') || 'unt
 // after a label toggle, unmount() before the instance is thrown away.
 const RENDERERS = {
   '3d': {create: create3d, focus: focus3d, restyle: restyle3d, relabel: relabel3d, unmount: unmount3d},
+  '2d': {create: create2d, focus: focus2d, restyle: restyle2d, relabel: relabel2d},   // no WebGL to release
 };
 let view = CONFIG.view, Graph = null;
 
@@ -67,19 +68,43 @@ function unpin() {
 // tear down the current renderer (if any) and build view `v` on the same
 // node and link objects; both libraries accept links whose endpoints are
 // already node objects and clear their own per-object bindings on _destructor
+//
+//   startup ──mount(CONFIG.view)──▶ [3d] ◀───radios───▶ [2d]
+//                                    │ create3d throws (no WebGL)
+//                                    ▼
+//                                   [2d], 3D radio disabled, reason in #nav
+//
+//   each mount: destroy old ─▶ pin(v) unless free-floating ─▶ create ─▶
+//               shared forces ─▶ restyle?.() ─▶ hint + radio
 function mount(v) {
   const el = document.getElementById('graph');
   if (Graph) { Graph._destructor(); RENDERERS[view].unmount?.(); el.replaceChildren(); }
   view = v;
-  if (physicsBox.checked) DATA.nodes.forEach(n => { if (n.z === undefined) n.z = 0; });   // free-floating: carry the picture over
-  else pin(v);
-  Graph = RENDERERS[v].create(el);
+  if (physicsBox.checked) {
+    // free-floating: x/y carry over, and 3D restarts from the flat 2D sheet every
+    // time (d3 jiggles coincident coordinates, so the layout leaves the plane on its own)
+    if (v === '3d') DATA.nodes.forEach(n => { n.z = 0; n.vz = 0; });
+  } else pin(v);
+  try {
+    Graph = RENDERERS[v].create(el);
+  } catch (e) {
+    // no WebGL (remote desktops, locked-down VMs, acceleration off): three.js
+    // throws while creating its renderer. The canvas view needs none.
+    if (v !== '3d') throw e;
+    console.warn('3D view unavailable, falling back to 2D:', e);
+    Graph = null; el.replaceChildren();
+    document.querySelector('input[name="view"][value="3d"]').disabled = true;
+    mount('2d');
+    document.getElementById('nav').textContent += ' · 3D needs WebGL, which this browser cannot provide';
+    return;
+  }
   // spacing scaled to sphere size so spheres and labels do not collide
   Graph.d3Force('link').distance(l => 26 + 1.6 * (rOf(l.source) + rOf(l.target)));
   Graph.d3Force('charge').strength(-80);
   RENDERERS[v].restyle?.();
   document.getElementById('nav').textContent =
     v === '2d' ? 'drag to pan · scroll to zoom' : 'drag to rotate · scroll to zoom';
+  document.querySelector(`input[name="view"][value="${v}"]`).checked = true;
 }
 
 // --- node detail card --------------------------------------------------------
@@ -221,6 +246,15 @@ document.getElementById('clear').addEventListener('click', () => {
   document.querySelectorAll('.row.grp.active').forEach(r => r.classList.remove('active'));
   applyFilter();
 });
+
+document.querySelectorAll('input[name="view"]').forEach(r =>
+  r.addEventListener('change', e => { if (e.target.checked && e.target.value !== view) mount(e.target.value); }));
+
+// the first pointer press or wheel on the picture means the user is looking at
+// something, so a late 2D fit must not snap the view away from it. Capture
+// phase: d3-zoom sits on the canvas itself and stops the wheel event there.
+['pointerdown', 'wheel'].forEach(type => document.getElementById('graph').addEventListener(
+  type, () => { if (Graph) Graph.__touched = true; }, {capture: true, passive: true}));
 
 // the controls above must exist before the first mount (mount reads physicsBox)
 mount(view);

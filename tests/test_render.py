@@ -203,10 +203,29 @@ def test_viewer_source_is_the_shared_file_followed_by_the_renderers():
     assert "__DATA__" not in src[len(shared):]           # only the shared file carries placeholders
 
 
-@pytest.mark.parametrize("path", [render.VIEWER_3D_JS])
+@pytest.mark.parametrize("path", [render.VIEWER_3D_JS, render.VIEWER_2D_JS])
 def test_renderer_files_hold_only_function_declarations(path):
     # appended after viewer.js and called from it through hoisting: a top-level
     # const/let would still be in its temporal dead zone when the shared code runs
     for line in path.read_text(encoding="utf-8").splitlines():
         if line and not line[0].isspace():
             assert line.startswith(("function ", "}", "//")), line
+
+
+def test_viewer_source_ends_with_the_2d_renderer():
+    src = render.viewer_source()
+    assert src.endswith(render.VIEWER_2D_JS.read_text(encoding="utf-8"))
+    assert src.index("function create3d(") < src.index("function create2d(")
+
+
+def test_2d_renderer_draws_on_a_canvas_and_pauses_when_idle():
+    js = render.VIEWER_2D_JS.read_text(encoding="utf-8")
+    assert "ForceGraph()(" in js and ".nodeCanvasObject(" in js and ".linkCanvasObject(" in js
+    assert "autoPauseRedraw" not in js               # the library default pauses an idle canvas ...
+    assert "function restyle2d(" in js and "function relabel2d(" in js   # ... and these mark it dirty
+    assert ".zoomToFit(" in js and "l.reverse.length ? 0 : 4.5" in js
+
+
+def test_page_offers_both_views(html):
+    assert 'name="view" value="3d"' in html and 'name="view" value="2d"' in html
+    assert 'id="nav"' in html

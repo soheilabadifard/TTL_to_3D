@@ -40,7 +40,7 @@ browser = ["pytest", "playwright"]
 include = ["ttl3d*"]
 
 [tool.setuptools.package-data]
-ttl3d = ["vendor/*.js", "vendor/*.md", "viewer.js", "viewer-3d.js", "viewer.css"]
+ttl3d = ["vendor/*.js", "vendor/*.md", "viewer.js", "viewer-3d.js", "viewer-2d.js", "viewer.css"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ttl3d.__version__"}

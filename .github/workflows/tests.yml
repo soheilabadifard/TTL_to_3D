@@ -36,6 +36,6 @@ jobs:
       - name: the installed package carries its viewer and vendor files and renders the demo
         run: |
           cd /tmp
-          python -c "import ttl3d, pathlib; p = pathlib.Path(ttl3d.__file__).parent; assert (p/'viewer.js').exists() and (p/'viewer-3d.js').exists() and (p/'viewer.css').exists() and (p/'vendor'/'fg-bundle.min.js').exists()"
+          python -c "import ttl3d, pathlib; p = pathlib.Path(ttl3d.__file__).parent; assert (p/'viewer.js').exists() and (p/'viewer-3d.js').exists() and (p/'viewer-2d.js').exists() and (p/'viewer.css').exists() and (p/'vendor'/'fg-bundle.min.js').exists()"
           ttl3d "$GITHUB_WORKSPACE/examples/solar-system.ttl" -o /tmp/solar.html
           test -s /tmp/solar.html

@@ -113,13 +113,15 @@ def test_cli_announces_a_big_stress_layout_on_stderr(tmp_path, capsys):
     assert "stress layout" in capsys.readouterr().err
 
 
-def test_cli_output_is_identical_across_processes(tmp_path):
+@pytest.mark.parametrize("view", ["3d", "2d"])
+def test_cli_output_is_identical_across_processes(tmp_path, view):
     pages = []
     for seed in ("1", "2"):
         out = tmp_path / f"solar-{seed}.html"
         r = subprocess.run([sys.executable, "-m", "ttl3d",
                             str(REPO / "examples" / "solar-system.ttl"),
-                            str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
+                            str(REPO / "examples" / "solar-system-missions.ttl"),
+                            "-o", str(out), "--view", view],
                            capture_output=True, text=True, cwd=REPO, check=False,
                            env={**os.environ, "PYTHONHASHSEED": seed})
         assert r.returncode == 0, r.stderr
@@ -178,3 +180,16 @@ def test_cli_pinned_pages_carry_a_layout_per_view(tmp_path, library):
     assert {"x", "y", "z", "x2", "y2"} <= set(_first_node(out))
     assert cli.main([str(library), "-o", str(out), "--layout", "force"]) == 0
     assert not {"x", "y", "z", "x2", "y2"} & set(_first_node(out))
+
+
+def test_cli_view_flag_sets_the_starting_view_and_the_default_name(tmp_path, library, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert cli.main([str(library), "--view", "2d"]) == 0
+    assert '"view": "2d"' in (tmp_path / "library-2d.html").read_text(encoding="utf-8")
+    assert "view: 2d" in capsys.readouterr().out
+
+
+def test_cli_rejects_an_unknown_view(library):
+    with pytest.raises(SystemExit) as e:
+        cli.main([str(library), "--view", "4d"])
+    assert e.value.code == 2
