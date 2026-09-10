@@ -92,4 +92,7 @@ function unmount3d() {
   Graph.controls().dispose();
   Graph.renderer().dispose();
   Graph.renderer().forceContextLoss();
+  // drop our handles on the dead scene so its meshes and sprite canvases can be collected
+  DATA.nodes.forEach(n => { n.__mesh = null; n.__sprite = null; });
+  DATA.links.forEach(l => { l.__sprite = null; });
 }

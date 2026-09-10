@@ -1,7 +1,7 @@
 # Licenses of the vendored libraries
 
 `fg-bundle.min.js` inlines every package listed here. The list is generated from
-`package-lock.json` by `licenses.py` (see the recipe in `VENDOR.md`); regenerate it
+`package-lock.json` by `tools/licenses.py` (see the recipe in `VENDOR.md`); regenerate it
 whenever the bundle is rebuilt. The licence texts follow the list.
 
 ## BSD-3-Clause

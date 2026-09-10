@@ -1,6 +1,6 @@
 """Write LICENSES.md for every runtime package in package-lock.json.
 
-    python ttl3d/vendor/licenses.py <build dir with node_modules> ttl3d/vendor/LICENSES.md
+    python tools/licenses.py <build dir with node_modules> ttl3d/vendor/LICENSES.md
 
 MIT and ISC both require the copyright notice to travel with copies, and the bundle
 inlines every runtime package of the lockfile, so each one gets a line. A package under
@@ -95,10 +95,11 @@ def main(build_dir: str, out: str) -> None:
         lic = meta.get("license") or pkg.get("license")
         if lic not in TEXTS:
             sys.exit(f"{name}: licence {lic!r} has no text in licenses.py; add it before rerunning")
-        rows.setdefault(lic, []).append(f"- {name} {meta['version']} — {copyright_line(Path(build_dir) / path, pkg.get('author'))}")
+        cr = copyright_line(Path(build_dir) / path, pkg.get("author"))
+        rows.setdefault(lic, []).append(f"- {name} {meta['version']} — {cr}")
     lines = ["# Licenses of the vendored libraries", "",
              "`fg-bundle.min.js` inlines every package listed here. The list is generated from",
-             "`package-lock.json` by `licenses.py` (see the recipe in `VENDOR.md`); regenerate it",
+             "`package-lock.json` by `tools/licenses.py` (see the recipe in `VENDOR.md`); regenerate it",
              "whenever the bundle is rebuilt. The licence texts follow the list.", ""]
     for lic in sorted(rows):
         lines += [f"## {lic}", "", *rows[lic], ""]

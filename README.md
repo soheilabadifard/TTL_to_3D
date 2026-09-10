@@ -4,10 +4,11 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 
-Turn any Turtle / RDF graph into a single self-contained HTML page with a 3D view (shaded spheres) and a 2D view (a flat canvas), permanent labels, predicate labels on the edges, a clickable legend,
-label search, and a detail card for every node. The page embeds all of its
-JavaScript, so it opens from a file, works offline, and never sends your data
-anywhere.
+Turn any Turtle / RDF graph into a single self-contained HTML page with a 3D
+view (shaded spheres) and a 2D view (a flat canvas), permanent labels, predicate
+labels on the edges, a clickable legend, label search, and a detail card for
+every node. The page embeds all of its JavaScript, so it opens from a file,
+works offline, and never sends your data anywhere.
 
 ![ttl3d rendering the Solar System demo ontology](docs/screenshot.png)
 
@@ -49,7 +50,7 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 |--------|--------|---------|
 | `-o, --out` | path | Output file. Default: `<first file stem>-<view>.html` in the current directory. |
 | `--color-by` | `file` (default), `type`, `namespace` | What node colours and the legend mean. In `file` mode edges also take the colour of the file asserting them. |
-| `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed 3D Kamada-Kawai position; `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
+| `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed Kamada-Kawai position, one layout per view (3D and 2D); `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
 | `--view` | `3d` (default), `2d` | Starting view. The page has a `3D \| 2D` switch either way, and each view is pinned to its own stress layout. |
 | `--title` | text | Page title. Default: the first file's stem. |
@@ -101,14 +102,14 @@ Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 The stress layout is quadratic in the number of nodes and label sprites are
 scene objects, so the automatic modes degrade instead of freezing:
 
-The stress layout is computed twice, once per view, so a pinned page takes about
-twice the layout time of 0.1.0.
-
 | Graph size | Layout | Labels |
 |-----------|--------|--------|
 | up to 800 nodes / 800 links | pinned stress layout | nodes and edges |
 | up to 1000 nodes | pinned stress layout | tooltips for the layer over its threshold |
 | larger | live force simulation | tooltips; switch sprites on from the panel |
+
+The stress layout is computed twice, once per view, so a pinned page takes about
+twice the layout time of 0.1.0.
 
 Force the behaviour you want with `--layout` and `--labels`.
 

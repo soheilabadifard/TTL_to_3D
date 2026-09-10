@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e .[test] ruff
-      - run: ruff check ttl3d tests
+      - run: ruff check ttl3d tests tools
       - run: python -m pytest -q
 
   wheel:

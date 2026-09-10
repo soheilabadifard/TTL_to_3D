@@ -144,9 +144,31 @@ def test_2d_page_without_a_precomputed_layout_runs_the_simulation(tmp_path):
                           " Graph.onEngineStop(() => { prev(); window.__stopped = true; });"
                           " void Graph.cooldownTicks(30)")
             page.wait_for_function("window.__stopped", timeout=30000)
+            page.wait_for_timeout(600)  # a wrongly fired 400 ms fit would have finished by now
             assert page.evaluate("Graph.zoom()") == zoom                       # the late fit stood down
             page.uncheck("#physics")                    # no precomputed layout: pins where the nodes are
             assert page.evaluate("DATA.nodes.every(n => n.fx === n.x && n.fy === n.y && !('fz' in n))")
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_untouched_force_layout_2d_page_frames_itself_when_the_engine_settles(tmp_path):
+    out = tmp_path / "solar-2d-force.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d", "--layout", "force")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.wait_for_function("DATA.nodes.every(n => typeof n.x === 'number')")
+            zoom = page.evaluate("Graph.zoom()")
+            page.evaluate("window.__stopped = false; const prev = Graph.onEngineStop();"
+                          " Graph.onEngineStop(() => { prev(); window.__stopped = true; });"
+                          " void Graph.cooldownTicks(30)")
+            page.wait_for_function("window.__stopped", timeout=30000)
+            page.wait_for_timeout(600)                        # let the 400 ms fit animation finish
+            assert page.evaluate("!Graph.__touched")          # nobody pressed or wheeled
+            assert page.evaluate("Graph.zoom()") != zoom      # so the late fit framed the graph
         finally:
             browser.close()
     assert errors == []

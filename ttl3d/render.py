@@ -20,7 +20,7 @@ from pathlib import Path
 
 VENDOR_JS = Path(__file__).parent / "vendor" / "fg-bundle.min.js"
 VIEWER_CSS = Path(__file__).parent / "viewer.css"
-VIEWER_JS = Path(__file__).parent / "viewer.js"          # shared app (already there)
+VIEWER_JS = Path(__file__).parent / "viewer.js"          # shared app
 VIEWER_3D_JS = Path(__file__).parent / "viewer-3d.js"    # one renderer file per view, appended after it
 VIEWER_2D_JS = Path(__file__).parent / "viewer-2d.js"
 # saturated-on-white categorical palette
