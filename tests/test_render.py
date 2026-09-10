@@ -55,6 +55,8 @@ def test_inclusive_legend_selection_is_pinned(html):
 
 def test_settled_force_constants(html):
     assert "26 + 1.6 *" in html and "strength(-80)" in html
+    shared = render.VIEWER_JS.read_text(encoding="utf-8")
+    assert "26 + 1.6 *" in shared and "strength(-80)" in shared    # applied in mount(), for every view
 
 
 def test_label_that_closes_a_script_tag_cannot_break_the_page(html):
@@ -128,7 +130,7 @@ def test_viewer_assets_are_files_and_are_inlined(html):
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 def test_viewer_js_is_valid_javascript(tmp_path):
-    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    js = render.viewer_source()
     for key in ("__DATA__", "__COLORS__", "__CONFIG__"):
         js = js.replace(key, "{}")
     probe = tmp_path / "viewer-probe.js"
@@ -176,7 +178,7 @@ def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
 
 
 def test_viewer_labels_bidirectional_links_with_both_predicates():
-    js = render.VIEWER_JS.read_text(encoding="utf-8")
+    js = render.viewer_source()
     assert "const linkText = " in js and "⇄" in js
     assert "l.reverse.length ? 0 : 4.5" in js
 
@@ -192,3 +194,19 @@ def test_config_embeds_the_view_and_rejects_unknown_ones(data):
     assert '"view": "3d"' in render.render_html(data, title="x", pinned=False, labels=labels)
     with pytest.raises(ValueError):
         render.render_html(data, title="x", pinned=False, labels=labels, view="up")
+
+
+def test_viewer_source_is_the_shared_file_followed_by_the_renderers():
+    src = render.viewer_source()
+    shared = render.VIEWER_JS.read_text(encoding="utf-8")
+    assert src.startswith(shared) and src.index("function create3d(") > len(shared)
+    assert "__DATA__" not in src[len(shared):]           # only the shared file carries placeholders
+
+
+@pytest.mark.parametrize("path", [render.VIEWER_3D_JS])
+def test_renderer_files_hold_only_function_declarations(path):
+    # appended after viewer.js and called from it through hoisting: a top-level
+    # const/let would still be in its temporal dead zone when the shared code runs
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line and not line[0].isspace():
+            assert line.startswith(("function ", "}", "//")), line

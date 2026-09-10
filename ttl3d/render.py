@@ -2,12 +2,13 @@
 
 The vendored bundle (3d-force-graph + force-graph + three-spritetext over one
 shared three.js) is inlined, so the page works offline with zero installs and
-never fetches from a CDN. The viewer's CSS and JS live in viewer.css / viewer.js
-next to this file and are inlined at render time. Nodes are shaded spheres
-with optional permanent labels, links are colored by the file asserting them
-(file mode) with predicate labels at their midpoints, the legend filters
-inclusively, and a card opens on click with the node's definition, synonyms,
-literal properties, relations and sources.
+never fetches from a CDN. The viewer's CSS and JS live next to this file
+(viewer.css; viewer.js shared by both views plus one renderer file per view)
+and are inlined at render time. Nodes are shaded spheres with optional
+permanent labels, links are colored by the file asserting them (file mode)
+with predicate labels at their midpoints, the legend filters inclusively, and
+a card opens on click with the node's definition, synonyms, literal
+properties, relations and sources.
 """
 from __future__ import annotations
 
@@ -19,7 +20,8 @@ from pathlib import Path
 
 VENDOR_JS = Path(__file__).parent / "vendor" / "fg-bundle.min.js"
 VIEWER_CSS = Path(__file__).parent / "viewer.css"
-VIEWER_JS = Path(__file__).parent / "viewer.js"
+VIEWER_JS = Path(__file__).parent / "viewer.js"          # shared app (already there)
+VIEWER_3D_JS = Path(__file__).parent / "viewer-3d.js"    # one renderer file per view, appended after it
 # saturated-on-white categorical palette
 PALETTE = ["#ca8a04", "#dc2626", "#2563eb", "#7c3aed", "#16a34a", "#0891b2",
            "#ea580c", "#db2777", "#4d7c0f", "#b45309", "#0f766e", "#111827"]
@@ -96,6 +98,14 @@ def fill(template: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(lambda m: values.get(m.group(), m.group()), template)
 
 
+def viewer_source() -> str:
+    """The app script with its placeholders intact: the shared viewer followed by one
+    renderer file per view. The renderer files hold function declarations only, so the
+    shared top-level code can call them through hoisting; the page and the JavaScript
+    syntax test both go through here so they never disagree on the order."""
+    return "\n".join(_read(p) for p in (VIEWER_JS, VIEWER_3D_JS))
+
+
 def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str = "3d") -> str:
     if view not in VIEWS:
         raise ValueError(f"view must be one of {VIEWS}, got {view!r}")
@@ -107,9 +117,9 @@ def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
                                                  "edge": bool(labels["edge"])},
               "view": view}
-    app = fill(_read(VIEWER_JS), {"__DATA__": script_safe(data),
-                                  "__COLORS__": script_safe(colors),
-                                  "__CONFIG__": script_safe(config)})
+    app = fill(viewer_source(), {"__DATA__": script_safe(data),
+                                 "__COLORS__": script_safe(colors),
+                                 "__CONFIG__": script_safe(config)})
     return fill(HTML_TEMPLATE, {
         "__CSS__": _read(VIEWER_CSS), "__LIB__": _bundle(), "__APP__": app,
         "__LEGEND__": legend, "__TITLE__": esc(title), "__COLORBY__": esc(config["colorBy"]),
@@ -144,7 +154,7 @@ __CSS__</style>
   <button id="clear">clear filters</button>
   <div id="hint">click legend rows to light a group's nodes, their neighbors, and the edges it asserts ·
     edges wear the color of the file asserting them when coloring by file ·
-    drag to rotate · scroll to zoom · click a node for details</div>
+    <span id="nav"></span> · click a node for details</div>
 </div>
 <div id="detail"><button id="close">×</button><div id="detail-body"></div></div>
 <div id="graph"></div>
