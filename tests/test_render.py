@@ -184,3 +184,11 @@ def test_viewer_labels_bidirectional_links_with_both_predicates():
 def test_viewer_shows_asserting_files_on_relation_rows():
     js = render.VIEWER_JS.read_text(encoding="utf-8")
     assert "files:l.files" in js and "r.files.join(', ')" in js
+
+
+def test_config_embeds_the_view_and_rejects_unknown_ones(data):
+    labels = {"node": True, "edge": True}
+    assert '"view": "2d"' in render.render_html(data, title="x", pinned=False, labels=labels, view="2d")
+    assert '"view": "3d"' in render.render_html(data, title="x", pinned=False, labels=labels)
+    with pytest.raises(ValueError):
+        render.render_html(data, title="x", pinned=False, labels=labels, view="up")

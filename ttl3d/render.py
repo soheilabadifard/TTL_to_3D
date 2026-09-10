@@ -26,6 +26,7 @@ PALETTE = ["#ca8a04", "#dc2626", "#2563eb", "#7c3aed", "#16a34a", "#0891b2",
 UNKNOWN_COLOR = "#9ca3af"
 OTHER_COLOR = "#94a3b8"
 MAX_COLORED_GROUPS = 11   # past len(PALETTE) groups, only the largest keep a colour
+VIEWS = ("3d", "2d")      # the starting view; the page switches between them
 
 
 def group_counts(data: dict) -> dict:
@@ -95,14 +96,17 @@ def fill(template: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(lambda m: values.get(m.group(), m.group()), template)
 
 
-def render_html(data: dict, *, title: str, pinned: bool, labels: dict) -> str:
+def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str = "3d") -> str:
+    if view not in VIEWS:
+        raise ValueError(f"view must be one of {VIEWS}, got {view!r}")
     esc = lambda s: _html.escape(str(s), quote=True)
     counts = group_counts(data)
     colors = assign_colors(data["groups"], counts)
     legend = _legend(data["groups"], colors, counts)
     config = {"title": title, "colorBy": data.get("color_by", "file"),
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
-                                                 "edge": bool(labels["edge"])}}
+                                                 "edge": bool(labels["edge"])},
+              "view": view}
     app = fill(_read(VIEWER_JS), {"__DATA__": script_safe(data),
                                   "__COLORS__": script_safe(colors),
                                   "__CONFIG__": script_safe(config)})

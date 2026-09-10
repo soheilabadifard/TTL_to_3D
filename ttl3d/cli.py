@@ -65,9 +65,12 @@ def main(argv: list[str] | None = None) -> int:
         notice = layout.stress_notice(len(data["nodes"]))
         if notice:
             print(notice, file=sys.stderr)
-        pos = layout.stress_positions([n["id"] for n in data["nodes"]], data["links"])
+        ids = [n["id"] for n in data["nodes"]]
+        pos3 = layout.stress_positions(ids, data["links"], dim=3)
+        pos2 = layout.stress_positions(ids, data["links"], dim=2)
         for n in data["nodes"]:
-            n["x"], n["y"], n["z"] = pos[n["id"]]
+            n["x"], n["y"], n["z"] = pos3[n["id"]]
+            n["x2"], n["y2"] = pos2[n["id"]]
     labels = layout.choose_labels(len(data["nodes"]), len(data["links"]), args.labels)
     html = render.render_html(data, title=args.title or first,
                               pinned=(mode == "stress"), labels=labels)

@@ -1,4 +1,5 @@
 """ttl3d.cli: the command line entry point."""
+import json
 import os
 import subprocess
 import sys
@@ -158,3 +159,22 @@ def test_cli_type_links_and_attribute_preds(tmp_path, library):
 def test_cli_unknown_prefix_in_attribute_preds_is_a_clean_error(tmp_path, library, capsys):
     rc = cli.main([str(library), "-o", str(tmp_path / "x.html"), "--attribute-preds", "nope:thing"])
     assert rc == 1 and "nope" in capsys.readouterr().err
+
+
+def test_cli_pages_start_in_3d(tmp_path, library):
+    out = tmp_path / "d.html"
+    assert cli.main([str(library), "-o", str(out)]) == 0
+    assert '"view": "3d"' in out.read_text(encoding="utf-8")
+
+
+def _first_node(page_path):
+    payload = page_path.read_text(encoding="utf-8").split("const DATA = ", 1)[1].split(";\n", 1)[0]
+    return json.loads(payload)["nodes"][0]
+
+
+def test_cli_pinned_pages_carry_a_layout_per_view(tmp_path, library):
+    out = tmp_path / "p.html"
+    assert cli.main([str(library), "-o", str(out)]) == 0
+    assert {"x", "y", "z", "x2", "y2"} <= set(_first_node(out))
+    assert cli.main([str(library), "-o", str(out), "--layout", "force"]) == 0
+    assert not {"x", "y", "z", "x2", "y2"} & set(_first_node(out))
