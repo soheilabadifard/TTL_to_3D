@@ -1,8 +1,8 @@
 """Render the node/link model as one self-contained HTML page.
 
-The vendored fg3d bundle (3d-force-graph + three-spritetext over one shared
-three.js) is inlined, so the page works offline with zero installs and never
-fetches from a CDN. The viewer's CSS and JS live in viewer.css / viewer.js
+The vendored bundle (3d-force-graph + force-graph + three-spritetext over one
+shared three.js) is inlined, so the page works offline with zero installs and
+never fetches from a CDN. The viewer's CSS and JS live in viewer.css / viewer.js
 next to this file and are inlined at render time. Nodes are shaded spheres
 with optional permanent labels, links are colored by the file asserting them
 (file mode) with predicate labels at their midpoints, the legend filters
@@ -17,7 +17,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-VENDOR_JS = Path(__file__).parent / "vendor" / "fg3d-bundle.min.js"
+VENDOR_JS = Path(__file__).parent / "vendor" / "fg-bundle.min.js"
 VIEWER_CSS = Path(__file__).parent / "viewer.css"
 VIEWER_JS = Path(__file__).parent / "viewer.js"
 # saturated-on-white categorical palette

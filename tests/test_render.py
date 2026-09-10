@@ -28,7 +28,7 @@ def test_page_is_self_contained(html):
     assert "<script src=" not in html
     assert 'src="http' not in html and 'href="http' not in html
     assert "sourceMappingURL" not in html
-    for g in ("ForceGraph3D", "SpriteText", "THREE"):
+    for g in ("ForceGraph3D", "ForceGraph", "SpriteText", "THREE"):
         assert g in html, g
     assert '"nodes"' in html and 'id="detail"' in html
     assert "<title>Library</title>" in html
