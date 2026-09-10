@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ttl3d"
 dynamic = ["version"]
-description = "Turn any Turtle / RDF graph into a self-contained, offline 3D HTML viewer"
+description = "Turn any Turtle / RDF graph into a self-contained, offline 2D/3D HTML viewer"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Soheil Abadifard"}]
 requires-python = ">=3.10"
 dependencies = ["rdflib>=7", "networkx>=3", "numpy", "scipy"]
 keywords = ["rdf", "turtle", "owl", "ontology", "knowledge-graph", "semantic-web",
-            "linked-data", "visualization", "3d", "graph-visualization"]
+            "linked-data", "visualization", "3d", "2d", "graph-visualization"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

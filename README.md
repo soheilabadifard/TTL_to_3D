@@ -4,8 +4,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 
-Turn any Turtle / RDF graph into a single self-contained 3D HTML page: shaded
-spheres, permanent labels, predicate labels on the edges, a clickable legend,
+Turn any Turtle / RDF graph into a single self-contained HTML page with a 3D view (shaded spheres) and a 2D view (a flat canvas), permanent labels, predicate labels on the edges, a clickable legend,
 label search, and a detail card for every node. The page embeds all of its
 JavaScript, so it opens from a file, works offline, and never sends your data
 anywhere.
@@ -48,10 +47,11 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 
 | Option | Values | Meaning |
 |--------|--------|---------|
-| `-o, --out` | path | Output file. Default: `<first file stem>-3d.html` in the current directory. |
+| `-o, --out` | path | Output file. Default: `<first file stem>-<view>.html` in the current directory. |
 | `--color-by` | `file` (default), `type`, `namespace` | What node colours and the legend mean. In `file` mode edges also take the colour of the file asserting them. |
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed 3D Kamada-Kawai position; `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
+| `--view` | `3d` (default), `2d` | Starting view. The page has a `3D \| 2D` switch either way, and each view is pinned to its own stress layout. |
 | `--title` | text | Page title. Default: the first file's stem. |
 | `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. Matched exactly: `--lang en` does not select `@en-GB`. |
 | `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, ...). Default: guess from the extension, then try Turtle. |
@@ -83,6 +83,9 @@ Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 
 - Legend rows filter inclusively: a selected group keeps its own nodes, their
   direct neighbours, and the endpoints of every edge it asserts.
+- The `3D | 2D` switch rebuilds the picture in the other view. Legend filters, the
+  search text and the open card carry over, and in pinned mode each view has its own
+  precomputed stress layout. A browser without WebGL opens in 2D and says so.
 - Search dims everything whose label does not match.
 - Click a node for its card: types, file, namespace, definition, synonyms,
   properties, incoming and outgoing relations (clickable), and sources.
@@ -98,6 +101,9 @@ Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 The stress layout is quadratic in the number of nodes and label sprites are
 scene objects, so the automatic modes degrade instead of freezing:
 
+The stress layout is computed twice, once per view, so a pinned page takes about
+twice the layout time of 0.1.0.
+
 | Graph size | Layout | Labels |
 |-----------|--------|--------|
 | up to 800 nodes / 800 links | pinned stress layout | nodes and edges |
@@ -111,7 +117,7 @@ Force the behaviour you want with `--layout` and `--labels`.
 - Blank nodes are skipped, so OWL restrictions and RDF lists do not appear.
 - No reasoning: only asserted triples are drawn.
 - One page holds one graph; there is no incremental loading.
-- The stress layout is quadratic: `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
+- The stress layout is quadratic and runs twice (3D and 2D): `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
 
 ## Development
 
@@ -120,13 +126,13 @@ python -m pytest -q
 ```
 
 The tests cover the loader, the node and link rules, the layout, the generated page, and the
-command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css` and `ttl3d/viewer.js`
+command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css`, `ttl3d/viewer.js` (shared by both views), `ttl3d/viewer-3d.js` and `ttl3d/viewer-2d.js` (one renderer per view)
 and are inlined into every page; when `node` is installed the suite syntax-checks the
-JavaScript. `pip install -e .[browser] && playwright install chromium` enables one headless
-browser test that loads the demo page and asserts zero console errors. The vendored JavaScript
-in `ttl3d/vendor/` bundles 3d-force-graph, three-spritetext and one shared three.js;
+JavaScript. `pip install -e .[browser] && playwright install chromium` enables the headless
+browser tests that load the demo pages, switch views and assert zero console errors. The vendored JavaScript
+in `ttl3d/vendor/` bundles 3d-force-graph, force-graph, three-spritetext and one shared three.js;
 `VENDOR.md` there has the rebuild recipe and `LICENSES.md` the upstream notices.
 
 ## License
 
-MIT. The vendored libraries are MIT as well.
+MIT. The vendored JavaScript is under permissive licences (MIT, ISC and others); `ttl3d/vendor/LICENSES.md` lists every bundled package with its licence and copyright line.
