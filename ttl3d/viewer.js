@@ -66,8 +66,10 @@ function unpin() {
 }
 // a pinned picture has nothing to simulate: stop the engine on its first tick
 // instead of running the library's 15 s cooldown, so the 2D canvas pauses at
-// once. Both renderers still place the nodes on that stopping tick, and a drag
-// resets the countdown, so dragging keeps working.
+// once. With cooldownTicks 0 the d3 tick never runs; pin() has already written
+// x/y/z, 3D copies them onto its objects in the same tickFrame that stops the
+// engine, and 2D paints from them directly. A drag resets the countdown and
+// moves the node itself, so dragging keeps working.
 function cooldown() { Graph.cooldownTicks(physicsBox.checked ? Infinity : 0); }
 
 // tear down the current renderer (if any) and build view `v` on the same

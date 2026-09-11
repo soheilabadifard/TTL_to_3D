@@ -215,7 +215,44 @@ def test_pinned_2d_canvas_paints_one_frame_per_reheat_and_repaints_on_a_filter_c
             idle = page.evaluate("window.__frames")
             assert idle <= 2                                      # the stopping frame plus at most one stray
             page.click(".row.grp")
-            page.wait_for_function(f"window.__frames > {idle}")   # restyle2d marked the canvas dirty
+            page.wait_for_function(f"window.__frames > {idle}", timeout=5000)   # restyle2d marked it dirty
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_dragging_a_node_on_a_pinned_2d_page_moves_it_and_leaves_the_canvas_idle(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.evaluate("window.__frames = 0; void Graph.onRenderFramePre(() => { window.__frames++; })")
+            page.evaluate("window.__hover = null; void Graph.onNodeHover(n => { window.__hover = n ? n.label : null; })")
+            page.evaluate("void Graph.d3ReheatSimulation()")
+            page.wait_for_function("window.__frames >= 1", timeout=5000)
+            before = page.evaluate("(() => { const n = DATA.nodes.find(n => n.label === 'Earth');"
+                                   " const s = Graph.graph2ScreenCoords(n.x, n.y); return [n.x, n.y, s.x, s.y]; })()")
+            box = page.locator("#graph canvas").first.bounding_box()
+            sx, sy = box["x"] + before[2], box["y"] + before[3]
+            # the hit-test canvas refreshes at most every 800 ms after a paint: press only once it finds the node
+            page.mouse.move(sx, sy)
+            page.wait_for_function("window.__hover === 'Earth'", timeout=5000)
+            page.mouse.down()
+            for i in range(1, 9):
+                page.mouse.move(sx + 5 * i, sy + 3 * i)
+                page.wait_for_timeout(30)
+            page.mouse.up()
+            after = page.evaluate("(() => { const n = DATA.nodes.find(n => n.label === 'Earth');"
+                                  " return [n.x, n.y, n.fx, n.fy]; })()")
+            assert (after[0], after[1]) != (before[0], before[1])              # the node followed the pointer
+            assert after[2] == after[0] and after[3] == after[1]                # and stays pinned where it was left
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            page.wait_for_timeout(300)                                          # the post-drag reheat stops
+            settled = page.evaluate("window.__frames")
+            page.wait_for_timeout(600)
+            assert page.evaluate("window.__frames") - settled <= 1              # idle again, not a 15 s cooldown
         finally:
             browser.close()
     assert errors == []
