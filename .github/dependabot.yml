@@ -1,0 +1,41 @@
+# Version updates for everything the repository depends on; security updates
+# are separate and enabled in the repository settings.
+#
+# The npm entry covers the exact pins behind ttl3d/vendor/fg-bundle.min.js.
+# Dependabot bumps package.json and the lockfile only: it neither rebuilds the
+# bundle nor regenerates LICENSES.md, and tests/test_bundle.py asserts the
+# force-graph and three pins, so its vendor PRs stay red until someone follows
+# the recipe in ttl3d/vendor/VENDOR.md on the PR branch. One grouped PR a month
+# keeps that a small, deliberate task.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(deps)
+
+  - package-ecosystem: npm
+    directory: /ttl3d/vendor
+    schedule:
+      interval: monthly
+    versioning-strategy: increase
+    groups:
+      vendor:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(vendor)

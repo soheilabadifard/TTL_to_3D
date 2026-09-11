@@ -45,6 +45,15 @@ Update the pins asserted in `tests/test_bundle.py` when force-graph or three
 changes, then commit `package.json`, `package-lock.json`, `fg-bundle.min.js`
 and `LICENSES.md` together (plus the test if it changed).
 
+Dependabot (`.github/dependabot.yml`) opens one grouped pull request a month
+when any of these pins has a newer release. It changes `package.json` and
+`package-lock.json` only, so its PR fails the suite (the notices test, and the
+pin assertions when force-graph or three moved) until someone finishes the
+bump on that branch: run the reproduce recipe above with the PR's two JSON
+files (`npm ci` follows the lockfile Dependabot rewrote), copy the bundle and
+the regenerated `LICENSES.md` back, adjust the asserted pins, and push. A red
+Dependabot PR here is the reminder to do that, not a broken build.
+
 The viewer needs all four globals; `tests/test_bundle.py` checks them, that the
 pins are exact and locked, and that `LICENSES.md` names every runtime package
 of the lockfile, so a rebuild that drops one fails the suite instead of
