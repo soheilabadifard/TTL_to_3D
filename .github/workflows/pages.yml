@@ -1,0 +1,51 @@
+name: demo site
+
+on:
+  push:
+    branches: [main]
+    paths: [ttl3d/**, examples/**, docs/demo/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - name: render the demo pages
+        run: |
+          mkdir -p site
+          ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl --title "Solar System" -o site/solar-system.html
+          ttl3d docs/demo/foaf.rdf --title "FOAF" --color-by type -o site/foaf.html
+          ttl3d docs/demo/skos.rdf --title "SKOS" --color-by type -o site/skos.html
+          ttl3d docs/demo/prov-o.ttl --title "PROV-O" --color-by type -o site/prov-o.html
+          ttl3d docs/demo/pizza.owl --title "Pizza ontology" --color-by type -o site/pizza.html
+          cp docs/demo/index.html site/
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
