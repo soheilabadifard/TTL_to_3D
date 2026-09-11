@@ -229,3 +229,17 @@ def test_2d_renderer_draws_on_a_canvas_and_pauses_when_idle():
 def test_page_offers_both_views(html):
     assert 'name="view" value="3d"' in html and 'name="view" value="2d"' in html
     assert 'id="nav"' in html
+
+
+def test_write_html_writes_lf_newlines_on_every_platform(tmp_path):
+    # text mode would translate "\n" into the platform's newline, so a page built on Windows
+    # would differ byte for byte from one built elsewhere. Only Windows can fail this test.
+    out = render.write_html("<p>a</p>\n<p>b</p>\n", tmp_path / "page.html")
+    assert b"\r" not in out.read_bytes()
+
+
+def test_inlined_viewer_assets_carry_lf_newlines_only():
+    # a checkout that converted them to CRLF would inline different bytes into every page
+    pkg = Path(render.__file__).parent
+    for name in ("viewer.js", "viewer-3d.js", "viewer-2d.js", "viewer.css", "vendor/fg-bundle.min.js"):
+        assert b"\r" not in (pkg / name).read_bytes(), name

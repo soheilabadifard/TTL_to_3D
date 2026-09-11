@@ -132,8 +132,10 @@ The tests cover the loader, the node and link rules, the layout, the generated p
 bundle's pins and licence notices, and the command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css`, `ttl3d/viewer.js` (shared by both views), `ttl3d/viewer-3d.js` and `ttl3d/viewer-2d.js` (one renderer per view)
 and are inlined into every page; when `node` is installed the suite syntax-checks the
 JavaScript. `pip install -e .[browser] && playwright install chromium` enables the headless
-browser tests that load the demo pages, switch views and assert zero console errors; CI runs them
-in a job of their own. The vendored JavaScript
+browser tests that load the demo pages, switch views and assert zero console errors
+(`TTL3D_BROWSER=firefox` or `webkit` picks another engine). CI runs the suite on Linux, Windows
+and macOS, the browser tests on Chromium, Firefox and WebKit, and checks that the demo pages
+built on the three systems are identical apart from the pinned layout's last digits. The vendored JavaScript
 in `ttl3d/vendor/` bundles 3d-force-graph, force-graph, three-spritetext and one shared three.js;
 `VENDOR.md` there has the rebuild recipe and `LICENSES.md` the upstream notices.
 

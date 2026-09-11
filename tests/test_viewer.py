@@ -1,5 +1,7 @@
 """Headless-browser smoke test of the generated page. Skips unless Playwright is installed
-(`pip install -e .[browser] && playwright install chromium`)."""
+(`pip install -e .[browser] && playwright install chromium`). TTL3D_BROWSER=firefox or webkit
+runs the same tests on another engine (`playwright install firefox webkit`)."""
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +11,32 @@ import pytest
 pw = pytest.importorskip("playwright.sync_api")
 
 REPO = Path(__file__).resolve().parents[1]
+BROWSER = os.environ.get("TTL3D_BROWSER", "chromium")
+# software WebGL for headless Chromium; the other engines take no such flags
+SWIFTSHADER = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] if BROWSER == "chromium" else []
+
+
+def _new_page(browser, errors):
+    page = browser.new_page()
+    page.set_default_timeout(90_000)       # CI VMs render WebGL in software; a first click can take a while
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    return page
+
+
+def _require_3d(page):
+    """Skip where the browser could give no WebGL context and the page fell back to 2D at load."""
+    if page.evaluate("document.querySelector('input[name=view][value=\"3d\"]').disabled"):
+        pytest.skip(f"{BROWSER} has no WebGL here; the page fell back to 2D")
+
+
+def _launch(p, args=None):
+    if BROWSER == "firefox":
+        # without a GPU Firefox's blocklist refuses any WebGL context; force its software path
+        return p.firefox.launch(firefox_user_prefs={"webgl.force-enabled": True})
+    if BROWSER == "webkit":
+        return p.webkit.launch()
+    return p.chromium.launch(args=SWIFTSHADER if args is None else args)
 
 
 def test_demo_page_runs_without_console_errors(tmp_path):
@@ -22,11 +50,9 @@ def test_demo_page_runs_without_console_errors(tmp_path):
     n_nodes = int(r.stdout.split()[0])
     errors = []
     with pw.sync_playwright() as p:
-        browser = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        browser = _launch(p)
         try:
-            page = browser.new_page()
-            page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-            page.on("pageerror", lambda e: errors.append(str(e)))
+            page = _new_page(browser, errors)
             page.goto(out.as_uri())
             page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
             assert page.evaluate("DATA.nodes.length") == n_nodes
@@ -57,11 +83,9 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
-        browser = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        browser = _launch(p)
         try:
-            page = browser.new_page()
-            page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-            page.on("pageerror", lambda e: errors.append(str(e)))
+            page = _new_page(browser, errors)
             page.goto(out.as_uri())
             page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
             page.click(".row.grp[data-groups]")
@@ -80,14 +104,9 @@ def _run_cli(*args):
     return r
 
 
-SWIFTSHADER = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
-
-
-def _open(p, url, errors, args=SWIFTSHADER):
-    browser = p.chromium.launch(args=args)
-    page = browser.new_page()
-    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-    page.on("pageerror", lambda e: errors.append(str(e)))
+def _open(p, url, errors, args=None):
+    browser = _launch(p, args)
+    page = _new_page(browser, errors)
     page.goto(url)
     page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
     return browser, page
@@ -181,6 +200,7 @@ def test_free_float_survives_a_switch_and_pins_back_to_each_views_layout(tmp_pat
     with pw.sync_playwright() as p:
         browser, page = _open(p, out.as_uri(), errors)
         try:
+            _require_3d(page)
             page.check("#physics")
             assert page.evaluate("DATA.nodes.every(n => n.fx === undefined && n.fz === undefined)")
             page.check('input[name="view"][value="2d"]')
@@ -287,6 +307,7 @@ def test_pinned_page_stops_the_simulation_on_its_first_tick_in_3d_too(tmp_path):
     with pw.sync_playwright() as p:
         browser, page = _open(p, out.as_uri(), errors)
         try:
+            _require_3d(page)
             assert page.evaluate("typeof Graph.scene") == "function"
             # a reheat on a pinned page ends on the next tick, not after the 15 s cooldown
             page.evaluate("window.__stopped = false; Graph.onEngineStop(() => { window.__stopped = true; });"
@@ -297,6 +318,7 @@ def test_pinned_page_stops_the_simulation_on_its_first_tick_in_3d_too(tmp_path):
     assert errors == []
 
 
+@pytest.mark.skipif(BROWSER != "chromium", reason="--disable-3d-apis is a Chromium flag")
 def test_default_page_falls_back_to_2d_without_webgl(tmp_path):
     out = tmp_path / "solar.html"
     _run_cli(*DEMO, "-o", str(out))
@@ -312,8 +334,7 @@ def test_default_page_falls_back_to_2d_without_webgl(tmp_path):
             assert page.evaluate("DATA.nodes.filter(n => n._dim).length") >= 1
         finally:
             browser.close()
-    # three.js may report the failed context on the console; nothing else may
-    assert all("WebGL" in e for e in errors), errors
+    assert errors == []     # the page asks for WebGL itself, so three.js never logs a failed context
 
 
 def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_path):
@@ -323,6 +344,7 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
     with pw.sync_playwright() as p:
         browser, page = _open(p, out.as_uri(), errors)
         try:
+            _require_3d(page)
             page.click(".row.grp")
             page.fill("#q", "earth")
             dimmed = page.evaluate("DATA.nodes.filter(n => n._dim).length")

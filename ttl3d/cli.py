@@ -49,10 +49,16 @@ def _fail(problem) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # stderr already replaces characters it cannot encode; stdout raises instead, and a console
+    # that cannot show the output path (Windows with stdout redirected, an ASCII locale) must
+    # still get the summary line, not a UnicodeEncodeError traceback
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")
     args = build_parser().parse_args(argv)
     first = Path(args.files[0]).stem
     out = Path(args.out) if args.out else Path.cwd() / f"{first}-{args.view}.html"
-    if out.resolve() in {Path(f).resolve() for f in args.files}:
+    # by identity, not by spelling: on case-insensitive filesystems Graph.ttl is graph.ttl
+    if out.exists() and any(Path(f).exists() and out.samefile(f) for f in args.files):
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
         ds = load.load_files(args.files, fmt=args.format)
