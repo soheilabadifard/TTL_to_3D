@@ -33,7 +33,7 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 
 ## MIT
 
-- 3d-force-graph 1.77.0 — Copyright (c) 2017 Vasco Asturiano
+- 3d-force-graph 1.80.0 — Copyright (c) 2017 Vasco Asturiano
 - @babel/runtime 7.29.7 — Copyright (c) 2014-present Sebastian McKenzie and other contributors
 - @tweenjs/tween.js 25.0.0 — Copyright (c) 2010-2012 Tween.js authors.
 - accessor-fn 1.5.3 — Copyright (c) 2017 Vasco Asturiano
@@ -51,7 +51,7 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 - ngraph.merge 1.0.0 — Copyright (c) 2013-2019 Andrei Kashcha
 - polished 4.3.1 — Copyright (c) 2016-Present Brian Hough and Maximilian Stoiber
 - preact 10.29.8 — Copyright (c) 2015-present Jason Miller
-- three 0.185.0 — Copyright © 2010-2026 three.js authors
+- three 0.185.1 — Copyright © 2010-2026 three.js authors
 - three-forcegraph 1.43.4 — Copyright (c) 2017 Vasco Asturiano
 - three-render-objects 1.42.0 — Copyright (c) 2018 Vasco Asturiano
 - three-spritetext 1.10.0 — Copyright (c) 2018 Vasco Asturiano

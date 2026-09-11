@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+Vendored bundle: 3d-force-graph 1.80.0 and three.js 0.185.1 (Dependabot #7).
 
 ## 0.2.0 (2026-09-11)
 
