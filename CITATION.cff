@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If ttl3d helped your work, please cite it as below."
+title: "ttl3d: a self-contained 3D and 2D HTML viewer for RDF graphs"
+type: software
+authors:
+  - family-names: Abadifard
+    given-names: Soheil
+version: 0.2.2
+date-released: 2026-09-11
+license: MIT
+repository-code: "https://github.com/soheilabadifard/TTL_to_3D"
+url: "https://soheilabadifard.github.io/TTL_to_3D/"
+abstract: >-
+  ttl3d turns one or more RDF files (Turtle, N-Triples, RDF/XML, JSON-LD) into a
+  single self-contained HTML page that shows the graph in 3D or 2D, with labels,
+  a legend by file, type or namespace, label search and a detail card for every
+  node. The page embeds all of its JavaScript, so it opens from a file and works
+  offline.
+keywords:
+  - RDF
+  - Turtle
+  - OWL
+  - ontology
+  - knowledge graph
+  - semantic web
+  - linked data
+  - graph visualization
