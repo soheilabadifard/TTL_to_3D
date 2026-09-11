@@ -37,6 +37,10 @@ function linkObj3d(l) {
 }
 
 function create3d(el) {
+  // three.js logs errors before it throws on a machine without WebGL; ask first, so the
+  // fallback to 2D (see mount in viewer.js) leaves the console clean
+  const probe = document.createElement('canvas');
+  if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) throw new Error('no WebGL context');
   const G = ForceGraph3D()(el)
     .graphData(DATA)
     .backgroundColor('#ffffff')
