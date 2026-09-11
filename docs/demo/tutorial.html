@@ -1,0 +1,72 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visualize an ontology with one command: ttl3d tutorial</title>
+<meta name="description" content="How to turn an OWL or RDF file into an interactive 3D or 2D graph page with ttl3d, using the Pizza ontology as the example.">
+<style>
+  body{font:15px/1.55 -apple-system,"Segoe UI",sans-serif;max-width:46rem;margin:3rem auto;padding:0 1rem;color:#1f2937}
+  h1{font-size:1.6rem;margin:0 0 .25rem} h2{font-size:1.15rem;margin:1.6rem 0 .4rem} p,li{margin:.4rem 0}
+  a{color:#1d4ed8} code{background:#f3f4f6;padding:.1rem .3rem;border-radius:3px}
+  pre{background:#f3f4f6;padding:.7rem .9rem;border-radius:4px;overflow-x:auto} pre code{padding:0}
+  .sub{color:#6b7280} table{border-collapse:collapse} td,th{text-align:left;padding:.2rem .8rem .2rem 0;vertical-align:top}
+</style>
+<h1>Visualize an ontology with one command</h1>
+<p class="sub">A five-minute tutorial for <a href="https://github.com/soheilabadifard/TTL_to_3D">ttl3d</a>, using the Pizza ontology.</p>
+
+<h2>What ttl3d does</h2>
+<p>ttl3d is a command-line tool that turns one or more RDF files (Turtle, N-Triples, RDF/XML, JSON-LD) into a
+single HTML page showing the graph in 3D or 2D. Every IRI that is a subject or the object of a relation
+becomes a node; every IRI-to-IRI triple becomes a link labelled with its predicate. The page embeds all of
+its JavaScript, so it opens from a file, works offline, and sends nothing anywhere. It runs on Python 3.10
+or newer on Linux, macOS and Windows.</p>
+
+<h2>Install</h2>
+<pre><code>pip install ttl3d</code></pre>
+
+<h2>Render the Pizza ontology</h2>
+<p>The <a href="https://protege.stanford.edu/ontologies/pizza/pizza.owl">Pizza ontology</a> is the classic
+OWL tutorial ontology from Stanford and Manchester. Download it, then run:</p>
+<pre><code>ttl3d pizza.owl --color-by type -o pizza.html</code></pre>
+<p>ttl3d prints one line, <code>121 nodes, 103 links -> pizza.html (view: 3d, layout: stress, labels: node+edge)</code>,
+and the page is ready. <a href="pizza.html">This is the result</a>. <code>--color-by type</code> colours each
+node by its <code>rdf:type</code>, so classes, object properties and individuals get their own legend rows;
+the default colours by input file instead, which is what you want when several files make up one ontology.</p>
+
+<h2>What you can do in the page</h2>
+<ul>
+  <li>Drag to rotate, scroll to zoom. The <strong>3D | 2D</strong> switch at the top rebuilds the same graph
+  as a flat canvas; filters, search and the open card carry over.</li>
+  <li>Click a legend row to keep that group, its neighbours and the edges it asserts, and dim the rest.
+  Type in the search box to dim everything whose label does not match.</li>
+  <li>Click a node for its card: types, definition, synonyms, properties, incoming and outgoing relations
+  (each clickable) and sources.</li>
+  <li>Nodes are pinned to a stress-minimised layout computed at build time, so the picture is the same every
+  time you open the file. "Free-float physics" releases them into a live simulation.</li>
+</ul>
+
+<h2>Options you will reach for</h2>
+<table>
+  <tr><th>Option</th><th>When</th></tr>
+  <tr><td><code>--view 2d</code></td><td>Start in the 2D view; the switch is there either way.</td></tr>
+  <tr><td><code>--lang de</code></td><td>Prefer German labels and definitions; untagged literals rank next.</td></tr>
+  <tr><td><code>--type-links</code></td><td>Draw <code>rdf:type</code> as edges instead of listing types on the card.</td></tr>
+  <tr><td><code>--attribute-preds foaf:homepage,rdfs:seeAlso</code></td><td>Keep predicates off the picture and show them on the card.</td></tr>
+  <tr><td><code>--layout force</code></td><td>Skip the precomputed layout for very large graphs; above 1000 nodes ttl3d does this on its own.</td></tr>
+  <tr><td><code>--format xml</code></td><td>Force a parser when the extension misleads, for example Turtle in a <code>.owl</code> file.</td></tr>
+</table>
+
+<h2>Several files, one graph</h2>
+<p>Pass every file of a modular ontology at once: <code>ttl3d core.ttl extensions.ttl -o all.html</code>.
+The nodes and links merge into one graph, the legend shows which file declared each node, and every relation
+row on a card names the files asserting it. That is the case ttl3d was written for, and the
+<a href="solar-system.html">Solar System demo</a> shows it with two files.</p>
+
+<h2>Limits</h2>
+<ul>
+  <li>Blank nodes are skipped, so OWL restrictions and RDF lists do not appear as nodes.</li>
+  <li>No reasoning: only asserted triples are drawn.</li>
+  <li>The stress layout is quadratic; on graphs far beyond 1000 nodes <code>--layout stress</code> takes minutes.</li>
+</ul>
+
+<p class="sub">More demos on the <a href="./">demo index</a>. Source, issues and the full option table:
+<a href="https://github.com/soheilabadifard/TTL_to_3D">github.com/soheilabadifard/TTL_to_3D</a>.</p>
