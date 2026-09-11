@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ttl3d demo pages</title>
+<style>
+  body{font:15px/1.5 -apple-system,"Segoe UI",sans-serif;max-width:44rem;margin:3rem auto;padding:0 1rem;color:#1f2937}
+  h1{font-size:1.6rem;margin:0 0 .25rem} p{margin:.5rem 0} ul{padding-left:1.2rem}
+  li{margin:.4rem 0} a{color:#1d4ed8} code{background:#f3f4f6;padding:.1rem .3rem;border-radius:3px}
+  .sub{color:#6b7280}
+</style>
+<h1>ttl3d demo pages</h1>
+<p class="sub">Every page below is one HTML file that <a href="https://github.com/soheilabadifard/TTL_to_3D">ttl3d</a>
+generated from an RDF file. It embeds all of its JavaScript, so it works offline and sends nothing anywhere.
+Drag to rotate, scroll to zoom, click the legend to filter, click a node for its card, and switch between 3D and 2D at the top.</p>
+<ul>
+  <li><a href="solar-system.html">Solar System</a> <span class="sub">— the two-file demo from the repository, coloured by file (48 links)</span></li>
+  <li><a href="foaf.html">FOAF</a> <span class="sub">— the Friend of a Friend vocabulary, coloured by type (89 nodes)</span></li>
+  <li><a href="skos.html">SKOS</a> <span class="sub">— Simple Knowledge Organization System (32 nodes)</span></li>
+  <li><a href="prov-o.html">PROV-O</a> <span class="sub">— the W3C provenance ontology (96 nodes)</span></li>
+  <li><a href="pizza.html">Pizza ontology</a> <span class="sub">— the classic OWL tutorial ontology (121 nodes)</span></li>
+</ul>
+<p>Make your own: <code>pip install ttl3d</code>, then <code>ttl3d your-file.ttl</code>.
+Sources and licences of the vocabularies: <a href="https://github.com/soheilabadifard/TTL_to_3D/blob/main/docs/demo/SOURCES.md">docs/demo/SOURCES.md</a>.</p>

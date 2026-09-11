@@ -18,6 +18,7 @@ dist/
 out/
 *.html
 !tests/fixtures/*.html
+!docs/demo/index.html
 
 # editor / os
 .DS_Store
