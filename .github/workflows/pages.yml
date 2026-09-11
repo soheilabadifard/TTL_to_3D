@@ -33,7 +33,7 @@ jobs:
           ttl3d docs/demo/skos.rdf --title "SKOS" --color-by type -o site/skos.html
           ttl3d docs/demo/prov-o.ttl --title "PROV-O" --color-by type -o site/prov-o.html
           ttl3d docs/demo/pizza.owl --title "Pizza ontology" --color-by type -o site/pizza.html
-          cp docs/demo/index.html site/
+          cp docs/demo/*.html site/
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
