@@ -74,7 +74,8 @@ def test_sources_go_to_the_card_not_the_links(tmp_path):
         "@prefix dcterms: <http://purl.org/dc/terms/> .\n"
         "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
         "ex:a prov:wasDerivedFrom ex:src ; dcterms:source ex:src2 .\n"
-        'ex:src rdfs:label "Source X" ; dcterms:identifier "https://doi.org/10.1/x" .\n')
+        'ex:src rdfs:label "Source X" ; dcterms:identifier "https://doi.org/10.1/x" .\n',
+        encoding="utf-8")
     data = build(ttl)
     a = next(n for n in data["nodes"] if n["id"].endswith("#a"))
     assert a["sources"] == [{"label": "Source X", "url": "https://doi.org/10.1/x"},
@@ -84,7 +85,7 @@ def test_sources_go_to_the_card_not_the_links(tmp_path):
 
 def test_parallel_edges_collapse_into_one_link(tmp_path):
     ttl = tmp_path / "p.ttl"
-    ttl.write_text("@prefix ex: <http://example.org/p#> .\nex:a ex:p ex:b .\nex:a ex:q ex:b .\n")
+    ttl.write_text("@prefix ex: <http://example.org/p#> .\nex:a ex:p ex:b .\nex:a ex:q ex:b .\n", encoding="utf-8")
     data = build(ttl)
     assert len(data["links"]) == 1
     assert data["links"][0]["predicates"] == ["p", "q"]

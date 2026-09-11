@@ -27,7 +27,7 @@ def test_same_stem_in_two_directories_gets_distinct_keys(tmp_path, library):
     b = tmp_path / "b" / "graph.ttl"
     for p in (a, b):
         p.parent.mkdir()
-        p.write_text(library.read_text())
+        p.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
     ds = load.load_files([a, b])
     assert len(ds.stems) == 2 and len(set(ds.stems)) == 2
 
