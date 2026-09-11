@@ -1,5 +1,6 @@
 # ttl3d
 
+[![PyPI](https://img.shields.io/pypi/v/ttl3d.svg)](https://pypi.org/project/ttl3d/)
 [![tests](https://github.com/soheilabadifard/TTL_to_3D/actions/workflows/tests.yml/badge.svg)](https://github.com/soheilabadifard/TTL_to_3D/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
@@ -142,6 +143,11 @@ and macOS, the browser tests on Chromium, Firefox and WebKit, and checks that th
 built on the three systems are identical apart from the pinned layout's last digits. The vendored JavaScript
 in `ttl3d/vendor/` bundles 3d-force-graph, force-graph, three-spritetext and one shared three.js;
 `VENDOR.md` there has the rebuild recipe and `LICENSES.md` the upstream notices.
+
+## Citing
+
+If ttl3d helped your work, cite it: `CITATION.cff` holds the reference and GitHub's "Cite this
+repository" button renders it as BibTeX or APA.
 
 ## License
 
