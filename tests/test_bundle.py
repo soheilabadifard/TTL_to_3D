@@ -18,7 +18,7 @@ def test_vendor_pins_are_exact_and_locked():
     pins = json.loads((VENDOR.parent / "package.json").read_text(encoding="utf-8"))
     for name, ver in {**pins["dependencies"], **pins["devDependencies"]}.items():
         assert ver[0].isdigit(), f"{name} is not pinned exactly: {ver}"
-    assert pins["dependencies"]["force-graph"] == "1.51.4" and pins["dependencies"]["three"] == "0.185.0"
+    assert pins["dependencies"]["force-graph"] == "1.51.4" and pins["dependencies"]["three"] == "0.185.1"
     assert (VENDOR.parent / "package-lock.json").exists()
 
 
