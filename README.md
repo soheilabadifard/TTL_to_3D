@@ -118,7 +118,7 @@ Force the behaviour you want with `--layout` and `--labels`.
 - Blank nodes are skipped, so OWL restrictions and RDF lists do not appear.
 - No reasoning: only asserted triples are drawn.
 - One page holds one graph; there is no incremental loading.
-- The stress layout is quadratic and runs twice (3D and 2D): `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
+- The stress layout is quadratic: `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
 
 ## Development
 
