@@ -1,5 +1,7 @@
 # working notes and tooling state
 ai-notes/
+CLAUDE.md
+CLAUDE.local.md
 .claude/
 .superpowers/
 *.plan.md

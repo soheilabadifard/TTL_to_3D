@@ -58,6 +58,7 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 | `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, ...). Default: guess from the extension, then try Turtle. |
 | `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
 | `--attribute-preds` | `prefix:local`, full IRI, or `<urn:...>` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable; wrap a URN or mailto in angle brackets. |
+| `--version` | flag | Print `ttl3d <version>` and exit. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 `.owl`, `.jsonld`, ...) through rdflib.
@@ -123,11 +124,12 @@ Force the behaviour you want with `--layout` and `--labels`.
 ## Development
 
 ```bash
+pip install -e .[test]
 python -m pytest -q
 ```
 
-The tests cover the loader, the node and link rules, the layout, the generated page, and the
-command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css`, `ttl3d/viewer.js` (shared by both views), `ttl3d/viewer-3d.js` and `ttl3d/viewer-2d.js` (one renderer per view)
+The tests cover the loader, the node and link rules, the layout, the generated page, the vendored
+bundle's pins and licence notices, and the command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css`, `ttl3d/viewer.js` (shared by both views), `ttl3d/viewer-3d.js` and `ttl3d/viewer-2d.js` (one renderer per view)
 and are inlined into every page; when `node` is installed the suite syntax-checks the
 JavaScript. `pip install -e .[browser] && playwright install chromium` enables the headless
 browser tests that load the demo pages, switch views and assert zero console errors; CI runs them
