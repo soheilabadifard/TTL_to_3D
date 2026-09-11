@@ -21,6 +21,13 @@ and an installed wheel. Because an inverse pair is one edge, node degree and
 sphere size shrink slightly for bidirectionally-asserted nodes compared with
 0.1.0.
 
+2D: `--view 2d|3d` picks the starting view and every page has a `3D | 2D`
+switch; the 2D view is a canvas renderer (force-graph) with the same filters,
+search and cards, and each view is pinned to its own stress layout, so the
+layout step runs twice. The vendored bundle is now `fg-bundle.min.js`,
+carries force-graph next to 3d-force-graph and is rebuilt from committed exact
+pins, and `LICENSES.md` now lists every package it inlines.
+
 ## 0.1.0 (2026-09-08)
 
 Initial release: command line tool, colouring by file / type / namespace,

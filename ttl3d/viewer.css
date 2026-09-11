@@ -21,6 +21,8 @@
            color:#374151; border:1px solid #c9cedb; border-radius:5px; cursor:pointer; }
   #clear:hover { background:#e5e7eb; }
   #hint { color:#6b7280; margin-top:6px; }
+  .row.views { color:#374151; margin-top:8px; gap:10px; }
+  .row.views label { display:inline-flex; align-items:center; gap:4px; cursor:pointer; }
 
   /* --- node detail card --- */
   #detail { position:fixed; top:12px; right:12px; z-index:10; width:330px;

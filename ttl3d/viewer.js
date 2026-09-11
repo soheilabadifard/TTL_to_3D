@@ -34,78 +34,78 @@ const rOf = x => radius(typeof x === 'object' ? x : {id: x});
 const colorOf = n => COLORS[n.group] || COLORS['?'];
 const linkColorOf = l => l.group ? (COLORS[l.group] || COLORS['?']) : LINK_COLOR;
 const idOf = x => typeof x === 'object' ? x.id : x;
+const tooltip = n => `<b>${esc(n.label)}</b><br>${esc(n.types.join(', ') || 'untyped')}<br><i>${esc(n.group)}</i>`;
 
-// pinned mode: every node sits at its precomputed stress-minimized position;
-// the "free-float physics" toggle releases them into the live force layout
-if (CONFIG.pinned) DATA.nodes.forEach(n => {
-  n.__px = n.x; n.__py = n.y; n.__pz = n.z;
-  n.fx = n.x; n.fy = n.y; n.fz = n.z;
-});
+// --- views -------------------------------------------------------------------
+// One renderer per view, each a set of function declarations in viewer-3d.js /
+// viewer-2d.js (appended after this file, so hoisting makes them callable here).
+// create(el) builds the graph on DATA and returns the instance; focus(n) frames
+// a node for its card. Optional: restyle() after a filter change, relabel()
+// after a label toggle, unmount() before the instance is thrown away.
+const RENDERERS = {
+  '3d': {create: create3d, focus: focus3d, restyle: restyle3d, relabel: relabel3d, unmount: unmount3d},
+  '2d': {create: create2d, focus: focus2d, restyle: restyle2d, relabel: relabel2d},   // no WebGL to release
+};
+let view = CONFIG.view, Graph = null;
 
-// physically-shaded sphere + (optional) permanent label, one group per node;
-// sprites are only created when labels are on, so big graphs stay light
-function nodeObj(n) {
-  const g = new THREE.Group();
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radius(n), 28, 28),
-    new THREE.MeshPhysicalMaterial({
-      color: n._dim ? DIM_NODE : colorOf(n),
-      roughness: 0.32, metalness: 0.1, clearcoat: 0.65, clearcoatRoughness: 0.3,
-    }));
-  g.add(mesh); n.__mesh = mesh; n.__sprite = null;
-  if (showNodeLabels) {
-    const s = new SpriteText(n.label);
-    s.color = n._dim ? DIM_LABEL : colorOf(n);
-    s.textHeight = 4.4; s.fontWeight = '600';
-    s.position.y = radius(n) + 4.2;
-    g.add(s); n.__sprite = s;
+// pinned mode: every node keeps a precomputed stress-minimized position per
+// view; the "free-float physics" toggle releases them into the live force
+// layout and pins them back where they were
+if (CONFIG.pinned) DATA.nodes.forEach(n => { n.__pos = {'3d': [n.x, n.y, n.z], '2d': [n.x2, n.y2]}; });
+
+function pin(v) {
+  DATA.nodes.forEach(n => {
+    // without a precomputed layout a node pins where it currently is (z = 0 if it never had one)
+    const p = n.__pos ? n.__pos[v] : (v === '2d' ? [n.x, n.y] : [n.x, n.y, n.z ?? 0]);
+    n.x = n.fx = p[0]; n.y = n.fy = p[1];
+    if (p.length > 2) n.z = n.fz = p[2]; else delete n.fz;
+  });
+}
+function unpin() {
+  DATA.nodes.forEach(n => { delete n.fx; delete n.fy; delete n.fz; });
+}
+
+// tear down the current renderer (if any) and build view `v` on the same
+// node and link objects; both libraries accept links whose endpoints are
+// already node objects and clear their own per-object bindings on _destructor
+//
+//   startup ──mount(CONFIG.view)──▶ [3d] ◀───radios───▶ [2d]
+//                                    │ create3d throws (no WebGL)
+//                                    ▼
+//                                   [2d], 3D radio disabled, reason in #nav
+//
+//   each mount: destroy old ─▶ pin(v) unless free-floating ─▶ create ─▶
+//               shared forces ─▶ restyle?.() ─▶ hint + radio
+function mount(v) {
+  const el = document.getElementById('graph');
+  if (Graph) { Graph._destructor(); RENDERERS[view].unmount?.(); el.replaceChildren(); }
+  view = v;
+  if (physicsBox.checked) {
+    // free-floating: x/y carry over, and 3D restarts from the flat 2D sheet every
+    // time (d3 jiggles coincident coordinates, so the layout leaves the plane on its own)
+    if (v === '3d') DATA.nodes.forEach(n => { n.z = 0; n.vz = 0; });
+  } else pin(v);
+  try {
+    Graph = RENDERERS[v].create(el);
+  } catch (e) {
+    // no WebGL (remote desktops, locked-down VMs, acceleration off): three.js
+    // throws while creating its renderer. The canvas view needs none.
+    if (v !== '3d') throw e;
+    console.warn('3D view unavailable, falling back to 2D:', e);
+    Graph = null; el.replaceChildren();
+    document.querySelector('input[name="view"][value="3d"]').disabled = true;
+    mount('2d');
+    document.getElementById('nav').textContent += ' · 3D needs WebGL, which this browser cannot provide';
+    return;
   }
-  return g;
+  // spacing scaled to sphere size so spheres and labels do not collide
+  Graph.d3Force('link').distance(l => 26 + 1.6 * (rOf(l.source) + rOf(l.target)));
+  Graph.d3Force('charge').strength(-80);
+  RENDERERS[v].restyle?.();
+  document.getElementById('nav').textContent =
+    v === '2d' ? 'drag to pan · scroll to zoom' : 'drag to rotate · scroll to zoom';
+  document.querySelector(`input[name="view"][value="${v}"]`).checked = true;
 }
-// predicate label at the middle of every edge (falsy = default line only)
-function linkObj(l) {
-  l.__sprite = null;
-  if (!showEdgeLabels) return undefined;
-  const s = new SpriteText(linkText(l));
-  s.color = l._dim ? DIM_LABEL : LINK_LABEL;
-  s.textHeight = 2.4;
-  l.__sprite = s;
-  return s;
-}
-
-const Graph = ForceGraph3D()(document.getElementById('graph'))
-  .graphData(DATA)
-  .backgroundColor('#ffffff')
-  .nodeLabel(n => `<b>${esc(n.label)}</b><br>${esc(n.types.join(', ') || 'untyped')}<br><i>${esc(n.group)}</i>`)
-  .nodeThreeObject(nodeObj)
-  .linkColor(l => l._dim ? DIM_LINK : linkColorOf(l))
-  .linkWidth(1.2)
-  .linkOpacity(0.55)
-  .linkDirectionalArrowLength(l => l.reverse.length ? 0 : 4.5)
-  .linkDirectionalArrowRelPos(1)
-  .linkThreeObjectExtend(true)
-  .linkThreeObject(linkObj)
-  .linkPositionUpdate((obj, {start, end}) => {
-    if (!obj) return false;
-    obj.position.set((start.x+end.x)/2, (start.y+end.y)/2, (start.z+end.z)/2);
-  })
-  .onNodeClick(showNode)
-  .onBackgroundClick(closeDetail);
-
-// spacing scaled to sphere size so spheres and labels do not collide
-Graph.d3Force('link').distance(l => 26 + 1.6 * (rOf(l.source) + rOf(l.target)));
-Graph.d3Force('charge').strength(-80);
-
-// studio-style lighting. Deliberately NO fog: white fog faded distant nodes
-// into the white background, so parts of the graph vanished when zooming out.
-const scene = Graph.scene();
-scene.add(new THREE.HemisphereLight(0xffffff, 0xd9dee7, 0.85));
-const key = new THREE.DirectionalLight(0xffffff, 1.1);
-key.position.set(150, 220, 120);
-scene.add(key);
-const fill = new THREE.DirectionalLight(0xdfe6f0, 0.35);
-fill.position.set(-140, -80, -100);
-scene.add(fill);
 
 // --- node detail card --------------------------------------------------------
 function esc(s) {
@@ -113,14 +113,8 @@ function esc(s) {
                   .replace(/"/g,'&quot;');
 }
 
-function focusNode(n) {
-  const d = Math.hypot(n.x, n.y, n.z) || 1;   // origin guard
-  const ratio = 1 + 60 / d;
-  Graph.cameraPosition({x:n.x*ratio, y:n.y*ratio, z:n.z*ratio}, n, 900);
-}
-
 function showNode(n) {
-  focusNode(n);
+  RENDERERS[view].focus(n);
   let h = `<h2><span class="dot" style="background:${colorOf(n)}"></span>${esc(n.label)}</h2>`;
   h += `<div class="cls">${esc(n.types.join(', ') || 'untyped')} · ${esc(n.group)}</div>`;
   h += `<div class="iri">${esc(n.id)}</div>`;
@@ -195,17 +189,14 @@ function applyFilter() {
   DATA.nodes.forEach(n => {
     const qOk = !query || n.label.toLowerCase().includes(query);
     n._dim = !(isKept(n) && qOk);
-    if (n.__mesh) n.__mesh.material.color.set(n._dim ? DIM_NODE : colorOf(n));
-    if (n.__sprite) n.__sprite.color = n._dim ? DIM_LABEL : colorOf(n);
   });
   DATA.links.forEach(l => {
     const grpLink = l.group && activeGroups.has(l.group);
     const touchesCore = !activeGroups.size ||
       core.has(idOf(l.source)) || core.has(idOf(l.target));
     l._dim = (l.source._dim && l.target._dim) || !(touchesCore || grpLink);
-    if (l.__sprite) l.__sprite.color = l._dim ? DIM_LABEL : LINK_LABEL;
   });
-  Graph.linkColor(Graph.linkColor());
+  RENDERERS[view].restyle?.();
   document.getElementById('panel').classList.toggle('filtered', activeGroups.size > 0);
 }
 
@@ -231,24 +222,20 @@ const nodeLabelBox = document.getElementById('nodelabels');
 nodeLabelBox.checked = showNodeLabels;
 nodeLabelBox.addEventListener('change', e => {
   showNodeLabels = e.target.checked;
-  Graph.refresh();
+  RENDERERS[view].relabel?.();
 });
 
 const edgeLabelBox = document.getElementById('edgelabels');
 edgeLabelBox.checked = showEdgeLabels;
 edgeLabelBox.addEventListener('change', e => {
   showEdgeLabels = e.target.checked;
-  Graph.refresh();
+  RENDERERS[view].relabel?.();
 });
 
 const physicsBox = document.getElementById('physics');
 physicsBox.checked = !CONFIG.pinned;
 physicsBox.addEventListener('change', e => {
-  if (e.target.checked) {
-    DATA.nodes.forEach(n => { delete n.fx; delete n.fy; delete n.fz; });
-  } else {
-    DATA.nodes.forEach(n => { n.fx = n.__px ?? n.x; n.fy = n.__py ?? n.y; n.fz = n.__pz ?? n.z; });
-  }
+  if (e.target.checked) unpin(); else pin(view);
   Graph.d3ReheatSimulation();
 });
 
@@ -259,3 +246,15 @@ document.getElementById('clear').addEventListener('click', () => {
   document.querySelectorAll('.row.grp.active').forEach(r => r.classList.remove('active'));
   applyFilter();
 });
+
+document.querySelectorAll('input[name="view"]').forEach(r =>
+  r.addEventListener('change', e => { if (e.target.checked && e.target.value !== view) mount(e.target.value); }));
+
+// the first pointer press or wheel on the picture means the user is looking at
+// something, so a late 2D fit must not snap the view away from it. Capture
+// phase: d3-zoom sits on the canvas itself and stops the wheel event there.
+['pointerdown', 'wheel'].forEach(type => document.getElementById('graph').addEventListener(
+  type, () => { if (Graph) Graph.__touched = true; }, {capture: true, passive: true}));
+
+// the controls above must exist before the first mount (mount reads physicsBox)
+mount(view);

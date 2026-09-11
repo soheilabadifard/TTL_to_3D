@@ -1,4 +1,4 @@
-"""Command line entry point: ttl3d FILE [FILE ...] [-o OUT] [--color-by KEY] ..."""
+"""Command line entry point: ttl3d FILE [FILE ...] [-o OUT] [--view 3d|2d] [--color-by KEY] ..."""
 from __future__ import annotations
 
 import argparse
@@ -11,10 +11,10 @@ from . import __version__, graph, layout, load, render
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ttl3d",
-        description="Render Turtle / RDF files as one self-contained 3D HTML viewer.")
+        description="Render Turtle / RDF files as one self-contained 2D/3D HTML viewer.")
     p.add_argument("files", nargs="+", help="RDF files; the format is guessed from the extension")
     p.add_argument("-o", "--out",
-                   help="output HTML path (default: <first file stem>-3d.html in the current directory)")
+                   help="output HTML path (default: <first file stem>-<view>.html in the current directory)")
     p.add_argument("--color-by", choices=graph.COLOR_KEYS, default="file",
                    help="what the node colors and legend mean (default: file)")
     p.add_argument("--layout", choices=layout.LAYOUT_MODES, default="auto",
@@ -23,6 +23,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--labels", choices=layout.LABEL_MODES, default="auto",
                    help=f"permanent labels (auto: nodes up to {layout.LABEL_MAX_NODES}, "
                         f"edges up to {layout.LABEL_MAX_LINKS}); hover = tooltips only")
+    p.add_argument("--view", choices=render.VIEWS, default="3d",
+                   help="starting view; the page can switch between 3d and 2d (default: 3d)")
     p.add_argument("--title", help="page title (default: first file stem)")
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
@@ -49,7 +51,7 @@ def _fail(problem) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     first = Path(args.files[0]).stem
-    out = Path(args.out) if args.out else Path.cwd() / f"{first}-3d.html"
+    out = Path(args.out) if args.out else Path.cwd() / f"{first}-{args.view}.html"
     if out.resolve() in {Path(f).resolve() for f in args.files}:
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
@@ -65,17 +67,20 @@ def main(argv: list[str] | None = None) -> int:
         notice = layout.stress_notice(len(data["nodes"]))
         if notice:
             print(notice, file=sys.stderr)
-        pos = layout.stress_positions([n["id"] for n in data["nodes"]], data["links"])
+        ids = [n["id"] for n in data["nodes"]]
+        pos3 = layout.stress_positions(ids, data["links"], dim=3)
+        pos2 = layout.stress_positions(ids, data["links"], dim=2)
         for n in data["nodes"]:
-            n["x"], n["y"], n["z"] = pos[n["id"]]
+            n["x"], n["y"], n["z"] = pos3[n["id"]]
+            n["x2"], n["y2"] = pos2[n["id"]]
     labels = layout.choose_labels(len(data["nodes"]), len(data["links"]), args.labels)
     html = render.render_html(data, title=args.title or first,
-                              pinned=(mode == "stress"), labels=labels)
+                              pinned=(mode == "stress"), labels=labels, view=args.view)
     try:
         render.write_html(html, out)
     except OSError as e:
         return _fail(e)
     shown = "+".join(k for k, v in labels.items() if v) or "hover only"
     print(f'{len(data["nodes"])} nodes, {len(data["links"])} links -> {out} '
-          f'(layout: {mode}, labels: {shown})')
+          f'(view: {args.view}, layout: {mode}, labels: {shown})')
     return 0

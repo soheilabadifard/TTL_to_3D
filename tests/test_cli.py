@@ -1,4 +1,5 @@
 """ttl3d.cli: the command line entry point."""
+import json
 import os
 import subprocess
 import sys
@@ -112,13 +113,15 @@ def test_cli_announces_a_big_stress_layout_on_stderr(tmp_path, capsys):
     assert "stress layout" in capsys.readouterr().err
 
 
-def test_cli_output_is_identical_across_processes(tmp_path):
+@pytest.mark.parametrize("view", ["3d", "2d"])
+def test_cli_output_is_identical_across_processes(tmp_path, view):
     pages = []
     for seed in ("1", "2"):
         out = tmp_path / f"solar-{seed}.html"
         r = subprocess.run([sys.executable, "-m", "ttl3d",
                             str(REPO / "examples" / "solar-system.ttl"),
-                            str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
+                            str(REPO / "examples" / "solar-system-missions.ttl"),
+                            "-o", str(out), "--view", view],
                            capture_output=True, text=True, cwd=REPO, check=False,
                            env={**os.environ, "PYTHONHASHSEED": seed})
         assert r.returncode == 0, r.stderr
@@ -158,3 +161,35 @@ def test_cli_type_links_and_attribute_preds(tmp_path, library):
 def test_cli_unknown_prefix_in_attribute_preds_is_a_clean_error(tmp_path, library, capsys):
     rc = cli.main([str(library), "-o", str(tmp_path / "x.html"), "--attribute-preds", "nope:thing"])
     assert rc == 1 and "nope" in capsys.readouterr().err
+
+
+def test_cli_pages_start_in_3d(tmp_path, library):
+    out = tmp_path / "d.html"
+    assert cli.main([str(library), "-o", str(out)]) == 0
+    assert '"view": "3d"' in out.read_text(encoding="utf-8")
+
+
+def _first_node(page_path):
+    payload = page_path.read_text(encoding="utf-8").split("const DATA = ", 1)[1].split(";\n", 1)[0]
+    return json.loads(payload)["nodes"][0]
+
+
+def test_cli_pinned_pages_carry_a_layout_per_view(tmp_path, library):
+    out = tmp_path / "p.html"
+    assert cli.main([str(library), "-o", str(out)]) == 0
+    assert {"x", "y", "z", "x2", "y2"} <= set(_first_node(out))
+    assert cli.main([str(library), "-o", str(out), "--layout", "force"]) == 0
+    assert not {"x", "y", "z", "x2", "y2"} & set(_first_node(out))
+
+
+def test_cli_view_flag_sets_the_starting_view_and_the_default_name(tmp_path, library, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert cli.main([str(library), "--view", "2d"]) == 0
+    assert '"view": "2d"' in (tmp_path / "library-2d.html").read_text(encoding="utf-8")
+    assert "view: 2d" in capsys.readouterr().out
+
+
+def test_cli_rejects_an_unknown_view(library):
+    with pytest.raises(SystemExit) as e:
+        cli.main([str(library), "--view", "4d"])
+    assert e.value.code == 2
