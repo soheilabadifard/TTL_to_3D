@@ -42,7 +42,8 @@ python tools/licenses.py /tmp/fgbuild ttl3d/vendor/LICENSES.md
 ```
 
 Update the pins asserted in `tests/test_bundle.py` when force-graph or three
-changes, then commit `package.json`, `package-lock.json`, `fg-bundle.min.js`
+changes, and the version numbers this file carries (its first paragraph and
+its last), then commit `package.json`, `package-lock.json`, `fg-bundle.min.js`
 and `LICENSES.md` together (plus the test if it changed).
 
 Dependabot (`.github/dependabot.yml`) opens one grouped pull request a month
