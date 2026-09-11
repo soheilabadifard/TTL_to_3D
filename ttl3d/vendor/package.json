@@ -3,9 +3,9 @@
   "private": true,
   "description": "Exact pins for rebuilding fg-bundle.min.js; the recipe is in VENDOR.md",
   "dependencies": {
-    "3d-force-graph": "1.77.0",
+    "3d-force-graph": "1.80.0",
     "force-graph": "1.51.4",
-    "three": "0.185.0",
+    "three": "0.185.1",
     "three-spritetext": "1.10.0"
   },
   "devDependencies": {
