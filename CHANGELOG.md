@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-Nothing yet.
+Fixes: a page written on Windows uses LF newlines, so the same input gives the
+same bytes on every platform (CI now builds the demo on Linux, Windows and
+macOS and compares them; only the pinned coordinates may drift by a few
+tenths); `-o` refuses an input file even when only the letter case differs;
+the summary line survives a console that cannot encode the output path. CI
+also runs the suite on macOS and the browser tests on Firefox and WebKit.
 
 ## 0.2.1 (2026-09-11)
 
