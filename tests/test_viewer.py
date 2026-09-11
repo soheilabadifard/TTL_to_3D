@@ -1,5 +1,7 @@
 """Headless-browser smoke test of the generated page. Skips unless Playwright is installed
-(`pip install -e .[browser] && playwright install chromium`)."""
+(`pip install -e .[browser] && playwright install chromium`). TTL3D_BROWSER=firefox or webkit
+runs the same tests on another engine (`playwright install firefox webkit`)."""
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +11,15 @@ import pytest
 pw = pytest.importorskip("playwright.sync_api")
 
 REPO = Path(__file__).resolve().parents[1]
+BROWSER = os.environ.get("TTL3D_BROWSER", "chromium")
+# software WebGL for headless Chromium; the other engines take no such flags
+SWIFTSHADER = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] if BROWSER == "chromium" else []
+
+
+def _launch(p, args=None):
+    if BROWSER != "chromium":
+        return getattr(p, BROWSER).launch()
+    return p.chromium.launch(args=SWIFTSHADER if args is None else args)
 
 
 def test_demo_page_runs_without_console_errors(tmp_path):
@@ -22,7 +33,7 @@ def test_demo_page_runs_without_console_errors(tmp_path):
     n_nodes = int(r.stdout.split()[0])
     errors = []
     with pw.sync_playwright() as p:
-        browser = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        browser = _launch(p)
         try:
             page = browser.new_page()
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
@@ -57,7 +68,7 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
-        browser = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
+        browser = _launch(p)
         try:
             page = browser.new_page()
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
@@ -80,11 +91,8 @@ def _run_cli(*args):
     return r
 
 
-SWIFTSHADER = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
-
-
-def _open(p, url, errors, args=SWIFTSHADER):
-    browser = p.chromium.launch(args=args)
+def _open(p, url, errors, args=None):
+    browser = _launch(p, args)
     page = browser.new_page()
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -297,6 +305,7 @@ def test_pinned_page_stops_the_simulation_on_its_first_tick_in_3d_too(tmp_path):
     assert errors == []
 
 
+@pytest.mark.skipif(BROWSER != "chromium", reason="--disable-3d-apis is a Chromium flag")
 def test_default_page_falls_back_to_2d_without_webgl(tmp_path):
     out = tmp_path / "solar.html"
     _run_cli(*DEMO, "-o", str(out))
