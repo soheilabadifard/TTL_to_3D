@@ -28,7 +28,9 @@ layout step runs twice. The vendored bundle is now `fg-bundle.min.js`,
 carries force-graph next to 3d-force-graph and is rebuilt from committed exact
 pins, and `LICENSES.md` now lists every package it inlines.
 
-Follow-ups: CI runs the headless-browser tests in a job of their own.
+Follow-ups: a pinned page stops the force engine on its first tick instead of
+running its 15 s cooldown, so the 2D canvas idles right after a mount or a
+pin-back; CI runs the headless-browser tests in a job of their own.
 
 ## 0.1.0 (2026-09-08)
 
