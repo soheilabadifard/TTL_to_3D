@@ -197,24 +197,101 @@ def test_free_float_survives_a_switch_and_pins_back_to_each_views_layout(tmp_pat
     assert errors == []
 
 
-def test_2d_canvas_pauses_when_idle_and_repaints_on_a_filter_change(tmp_path):
+def test_pinned_2d_canvas_paints_one_frame_per_reheat_and_repaints_on_a_filter_change(tmp_path):
     out = tmp_path / "solar-2d.html"
     _run_cli(*DEMO, "-o", str(out), "--view", "2d")
     errors = []
     with pw.sync_playwright() as p:
         browser, page = _open(p, out.as_uri(), errors)
         try:
-            # trailing void: see the same comment in test_2d_page_without_a_precomputed_layout_runs_the_simulation
-            page.evaluate("window.__stopped = false; const prev = Graph.onEngineStop();"
-                          " Graph.onEngineStop(() => { prev(); window.__stopped = true; });"
-                          " void Graph.cooldownTicks(30)")                # settle in a few frames, not 15 s
-            page.wait_for_function("window.__stopped", timeout=30000)
+            # every node is pinned, so the engine has nothing to do: it must stop on its first tick
+            # instead of redrawing the canvas for the library's 15 s cooldown. The engine may already
+            # have stopped before this hook exists (and onRenderFramePre marks nothing dirty), so a
+            # reheat starts it at a known moment: one painted frame, then idle
             page.evaluate("window.__frames = 0; void Graph.onRenderFramePre(() => { window.__frames++; })")
-            page.wait_for_timeout(400)
+            page.evaluate("void Graph.d3ReheatSimulation()")
+            page.wait_for_function("window.__frames >= 1", timeout=5000)
+            page.wait_for_timeout(1000)
             idle = page.evaluate("window.__frames")
-            assert idle <= 1                                      # paused: at most one stray frame
+            assert idle <= 2                                      # the stopping frame plus at most one stray
             page.click(".row.grp")
-            page.wait_for_function(f"window.__frames > {idle}")   # restyle2d marked the canvas dirty
+            page.wait_for_function(f"window.__frames > {idle}", timeout=5000)   # restyle2d marked it dirty
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_dragging_a_node_on_a_pinned_2d_page_moves_it_and_leaves_the_canvas_idle(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.evaluate("window.__frames = 0; void Graph.onRenderFramePre(() => { window.__frames++; })")
+            page.evaluate("window.__hover = null; void Graph.onNodeHover(n => { window.__hover = n ? n.label : null; })")
+            page.evaluate("void Graph.d3ReheatSimulation()")
+            page.wait_for_function("window.__frames >= 1", timeout=5000)
+            before = page.evaluate("(() => { const n = DATA.nodes.find(n => n.label === 'Earth');"
+                                   " const s = Graph.graph2ScreenCoords(n.x, n.y); return [n.x, n.y, s.x, s.y]; })()")
+            box = page.locator("#graph canvas").first.bounding_box()
+            sx, sy = box["x"] + before[2], box["y"] + before[3]
+            # the hit-test canvas refreshes at most every 800 ms after a paint: press only once it finds the node
+            page.mouse.move(sx, sy)
+            page.wait_for_function("window.__hover === 'Earth'", timeout=5000)
+            page.mouse.down()
+            for i in range(1, 9):
+                page.mouse.move(sx + 5 * i, sy + 3 * i)
+                page.wait_for_timeout(30)
+            page.mouse.up()
+            after = page.evaluate("(() => { const n = DATA.nodes.find(n => n.label === 'Earth');"
+                                  " return [n.x, n.y, n.fx, n.fy]; })()")
+            assert (after[0], after[1]) != (before[0], before[1])              # the node followed the pointer
+            assert after[2] == after[0] and after[3] == after[1]                # and stays pinned where it was left
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            page.wait_for_timeout(300)                                          # the post-drag reheat stops
+            settled = page.evaluate("window.__frames")
+            page.wait_for_timeout(600)
+            assert page.evaluate("window.__frames") - settled <= 1              # idle again, not a 15 s cooldown
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_free_float_toggle_restarts_the_simulation_and_pinning_back_stops_it(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.wait_for_timeout(300)
+            page.evaluate("window.__frames = 0; void Graph.onRenderFramePre(() => { window.__frames++; })")
+            page.check("#physics")                                # released: the simulation runs on
+            page.wait_for_function("window.__frames > 10", timeout=5000)
+            page.uncheck("#physics")                              # pinned back: one repaint, then idle
+            page.wait_for_timeout(300)
+            settled = page.evaluate("window.__frames")
+            page.wait_for_timeout(400)
+            assert page.evaluate("window.__frames") - settled <= 1
+            assert page.evaluate("DATA.nodes.every(n => n.fx === n.__pos['2d'][0] && n.fy === n.__pos['2d'][1])")
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_pinned_page_stops_the_simulation_on_its_first_tick_in_3d_too(tmp_path):
+    out = tmp_path / "solar.html"
+    _run_cli(*DEMO, "-o", str(out))
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            assert page.evaluate("typeof Graph.scene") == "function"
+            # a reheat on a pinned page ends on the next tick, not after the 15 s cooldown
+            page.evaluate("window.__stopped = false; Graph.onEngineStop(() => { window.__stopped = true; });"
+                          " void Graph.d3ReheatSimulation()")
+            page.wait_for_function("window.__stopped", timeout=5000)
         finally:
             browser.close()
     assert errors == []

@@ -117,7 +117,7 @@ def test_group_names_are_html_escaped_in_the_legend(data):
 
 def test_write_html_creates_parent_directories(tmp_path):
     out = render.write_html("<p>x</p>", tmp_path / "deep" / "er" / "page.html")
-    assert out.read_text() == "<p>x</p>"
+    assert out.read_text(encoding="utf-8") == "<p>x</p>"
 
 
 def test_viewer_assets_are_files_and_are_inlined(html):

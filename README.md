@@ -118,7 +118,7 @@ Force the behaviour you want with `--layout` and `--labels`.
 - Blank nodes are skipped, so OWL restrictions and RDF lists do not appear.
 - No reasoning: only asserted triples are drawn.
 - One page holds one graph; there is no incremental loading.
-- The stress layout is quadratic and runs twice (3D and 2D): `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
+- The stress layout is quadratic: `--layout stress` on graphs far beyond 1000 nodes can take minutes, and the CLI says so on stderr.
 
 ## Development
 
@@ -130,7 +130,8 @@ The tests cover the loader, the node and link rules, the layout, the generated p
 command line. The viewer's CSS and JavaScript live in `ttl3d/viewer.css`, `ttl3d/viewer.js` (shared by both views), `ttl3d/viewer-3d.js` and `ttl3d/viewer-2d.js` (one renderer per view)
 and are inlined into every page; when `node` is installed the suite syntax-checks the
 JavaScript. `pip install -e .[browser] && playwright install chromium` enables the headless
-browser tests that load the demo pages, switch views and assert zero console errors. The vendored JavaScript
+browser tests that load the demo pages, switch views and assert zero console errors; CI runs them
+in a job of their own. The vendored JavaScript
 in `ttl3d/vendor/` bundles 3d-force-graph, force-graph, three-spritetext and one shared three.js;
 `VENDOR.md` there has the rebuild recipe and `LICENSES.md` the upstream notices.
 

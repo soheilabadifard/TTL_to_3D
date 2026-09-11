@@ -23,6 +23,20 @@ jobs:
       - run: ruff check ttl3d tests tools
       - run: python -m pytest -q
 
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .[browser]
+      - run: playwright install --with-deps chromium
+      - name: the browser tests must run here, not skip
+        run: python -c "import playwright.sync_api"
+      - run: python -m pytest -q tests/test_viewer.py
+
   wheel:
     runs-on: ubuntu-latest
     steps:

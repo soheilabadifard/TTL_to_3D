@@ -64,6 +64,13 @@ function pin(v) {
 function unpin() {
   DATA.nodes.forEach(n => { delete n.fx; delete n.fy; delete n.fz; });
 }
+// a pinned picture has nothing to simulate: stop the engine on its first tick
+// instead of running the library's 15 s cooldown, so the 2D canvas pauses at
+// once. With cooldownTicks 0 the d3 tick never runs; pin() has already written
+// x/y/z, 3D copies them onto its objects in the same tickFrame that stops the
+// engine, and 2D paints from them directly. A drag resets the countdown and
+// moves the node itself, so dragging keeps working.
+function cooldown() { Graph.cooldownTicks(physicsBox.checked ? Infinity : 0); }
 
 // tear down the current renderer (if any) and build view `v` on the same
 // node and link objects; both libraries accept links whose endpoints are
@@ -75,7 +82,7 @@ function unpin() {
 //                                   [2d], 3D radio disabled, reason in #nav
 //
 //   each mount: destroy old ─▶ pin(v) unless free-floating ─▶ create ─▶
-//               shared forces ─▶ restyle?.() ─▶ hint + radio
+//               shared forces + cooldown ─▶ restyle?.() ─▶ hint + radio
 function mount(v) {
   const el = document.getElementById('graph');
   if (Graph) { Graph._destructor(); RENDERERS[view].unmount?.(); el.replaceChildren(); }
@@ -101,6 +108,7 @@ function mount(v) {
   // spacing scaled to sphere size so spheres and labels do not collide
   Graph.d3Force('link').distance(l => 26 + 1.6 * (rOf(l.source) + rOf(l.target)));
   Graph.d3Force('charge').strength(-80);
+  cooldown();
   RENDERERS[v].restyle?.();
   document.getElementById('nav').textContent =
     v === '2d' ? 'drag to pan · scroll to zoom' : 'drag to rotate · scroll to zoom';
@@ -236,6 +244,7 @@ const physicsBox = document.getElementById('physics');
 physicsBox.checked = !CONFIG.pinned;
 physicsBox.addEventListener('change', e => {
   if (e.target.checked) unpin(); else pin(view);
+  cooldown();
   Graph.d3ReheatSimulation();
 });
 
