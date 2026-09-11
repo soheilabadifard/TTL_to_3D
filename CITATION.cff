@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: Abadifard
     given-names: Soheil
-version: 0.2.2
+version: 0.2.3
 date-released: 2026-09-11
 license: MIT
 repository-code: "https://github.com/soheilabadifard/TTL_to_3D"
