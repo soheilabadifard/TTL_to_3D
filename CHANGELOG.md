@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.2.2 (2026-09-11)
+
 Fixes: a page written on Windows uses LF newlines, so the same input gives the
 same bytes on every platform (CI now builds the demo on Linux, Windows and
 macOS and compares them; only the pinned coordinates may drift by a few
 tenths); `-o` refuses an input file even when only the letter case differs;
 the summary line survives a console that cannot encode the output path. CI
-also runs the suite on macOS and the browser tests on Firefox and WebKit.
+also runs the suite on macOS and the browser tests on Firefox and WebKit. A
+browser without WebGL now falls back to the 2D view with a clean console: the
+page asks for a context itself before three.js can log a failed one.
 
 ## 0.2.1 (2026-09-11)
 
