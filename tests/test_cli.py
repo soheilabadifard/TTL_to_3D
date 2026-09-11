@@ -193,3 +193,35 @@ def test_cli_rejects_an_unknown_view(library):
     with pytest.raises(SystemExit) as e:
         cli.main([str(library), "--view", "4d"])
     assert e.value.code == 2
+
+
+def test_output_naming_an_input_in_another_case_is_refused_where_the_filesystem_ignores_case(tmp_path, library,
+                                                                                            capsys):
+    (tmp_path / "probe").write_text("", encoding="utf-8")
+    if not (tmp_path / "PROBE").exists():
+        pytest.skip("case-sensitive filesystem")
+    src = tmp_path / "graph.ttl"
+    src.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
+    rc = cli.main([str(src), "-o", str(tmp_path / "GRAPH.TTL")])
+    assert rc == 1 and "also an input" in capsys.readouterr().err
+    assert src.read_text(encoding="utf-8") == library.read_text(encoding="utf-8")   # the input is intact
+
+
+ASCII_CONSOLE = {**os.environ, "PYTHONIOENCODING": "ascii"}   # a console that cannot show an é
+
+
+def test_an_error_message_survives_a_console_that_cannot_encode_it(tmp_path):
+    bad = tmp_path / "données.ttl"
+    bad.write_text("@prefix ex: <http://example.org/é#> .\nex:a ex:b \"unterminated .\n", encoding="utf-8")
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(bad), "-o", str(tmp_path / "out.html")],
+                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False)
+    err = r.stderr.decode("ascii")
+    assert r.returncode == 1 and err.startswith("ttl3d: error:") and "Traceback" not in err, err
+
+
+def test_the_summary_line_survives_a_console_that_cannot_encode_the_output_path(tmp_path, library):
+    out = tmp_path / "sortie-é.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(library), "-o", str(out)],
+                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False)
+    assert r.returncode == 0 and out.exists(), r.stderr.decode("ascii", "replace")
+    assert r.stdout.decode("ascii").split()[0].isdigit()
