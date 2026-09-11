@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Nothing yet.
+Releases are archived on Zenodo; `CITATION.cff` and the README carry the DOI.
 
 ## 0.2.3 (2026-09-11)
 
