@@ -130,7 +130,7 @@ def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str
 def write_html(html: str, out: Path | str) -> Path:
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
+    out.write_text(html, encoding="utf-8", newline="\n")   # LF on Windows too: same bytes everywhere
     return out
 
 
