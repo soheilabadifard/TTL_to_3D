@@ -17,8 +17,11 @@ SWIFTSHADER = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] if BROW
 
 
 def _launch(p, args=None):
-    if BROWSER != "chromium":
-        return getattr(p, BROWSER).launch()
+    if BROWSER == "firefox":
+        # without a GPU Firefox's blocklist refuses any WebGL context; force its software path
+        return p.firefox.launch(firefox_user_prefs={"webgl.force-enabled": True})
+    if BROWSER == "webkit":
+        return p.webkit.launch()
     return p.chromium.launch(args=SWIFTSHADER if args is None else args)
 
 
