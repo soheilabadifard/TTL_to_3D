@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.2.0 (2026-09-11)
+
 Fixes: the pinned layout is reproducible run to run; header-only files and
 reflexive triples no longer crash the layout; `-o` refuses to overwrite an
 input; missing, malformed and unwritable paths give a one-line error instead
