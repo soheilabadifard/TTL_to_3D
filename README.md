@@ -10,7 +10,10 @@ labels on the edges, a clickable legend, label search, and a detail card for
 every node. The page embeds all of its JavaScript, so it opens from a file,
 works offline, and never sends your data anywhere.
 
-![ttl3d rendering the Solar System demo ontology](docs/screenshot.png)
+**[Try it in your browser](https://soheilabadifard.github.io/TTL_to_3D/)**: the Solar System demo,
+FOAF, SKOS, PROV-O and the Pizza ontology, each a page ttl3d generated.
+
+![ttl3d: orbit the Solar System demo in 3D, filter by legend, open a card, switch to 2D](https://raw.githubusercontent.com/soheilabadifard/TTL_to_3D/main/docs/demo.gif)
 
 ## Why
 
@@ -25,10 +28,11 @@ multi-file ontology, then generalized to any RDF input.
 Python 3.10 or newer.
 
 ```bash
-pip install git+https://github.com/soheilabadifard/TTL_to_3D
+pip install ttl3d
 ```
 
-Or clone the repository and run `pip install -e .`. The dependencies are
+For the development version, `pip install git+https://github.com/soheilabadifard/TTL_to_3D`,
+or clone the repository and run `pip install -e .`. The dependencies are
 `rdflib`, `networkx`, `numpy` and `scipy`, all available on conda-forge as
 well.
 

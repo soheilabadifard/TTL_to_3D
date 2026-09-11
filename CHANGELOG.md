@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-Nothing yet.
+Published on PyPI (`pip install ttl3d`) by a release workflow with trusted
+publishing; a demo site (https://soheilabadifard.github.io/TTL_to_3D/) with the
+Solar System, FOAF, SKOS, PROV-O and Pizza pages, rebuilt on every push to
+`main`; the README shows the viewer in motion.
 
 ## 0.2.2 (2026-09-11)
 

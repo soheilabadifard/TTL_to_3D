@@ -1,0 +1,66 @@
+name: publish
+
+# Runs when a GitHub release is published, or by hand for an existing tag. Publishes to PyPI
+# through trusted publishing (the "pypi" environment; no token stored) and attaches the
+# built files to the release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "existing tag to publish, e.g. v0.2.2"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: the tag names the package version
+        run: test "v$(python -c 'import ttl3d; print(ttl3d.__version__)')" = "${{ inputs.tag || github.event.release.tag_name }}"
+      - run: pip install build
+      - run: python -m build
+      - name: the wheel installs and renders the demo
+        run: |
+          pip install dist/*.whl
+          cd /tmp && ttl3d "$GITHUB_WORKSPACE/examples/solar-system.ttl" -o /tmp/solar.html && test -s /tmp/solar.html
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  release-assets:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag || github.event.release.tag_name }}" dist/* --clobber --repo "${{ github.repository }}"
