@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.2.1 (2026-09-11)
+
 Vendored bundle: 3d-force-graph 1.80.0 and three.js 0.185.1 (Dependabot #7).
+Dependabot now keeps the GitHub Actions, the Python extras and the vendored
+pins current, and CI runs on the v7 actions.
 
 ## 0.2.0 (2026-09-11)
 
