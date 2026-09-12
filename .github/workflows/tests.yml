@@ -25,6 +25,11 @@ jobs:
       - run: pip install -e .[test] ruff
       - run: ruff check ttl3d tests tools
       - run: python -m pytest -q
+      - name: the loader on the oldest rdflib the pin allows (7.0.0 has no Dataset.graphs)
+        if: matrix.python-version == '3.10' && matrix.os == 'ubuntu-latest'
+        run: |
+          pip install "rdflib==7.0.0"
+          python -m pytest -q tests/test_load.py tests/test_graph.py
 
   browser:
     runs-on: ${{ matrix.os }}

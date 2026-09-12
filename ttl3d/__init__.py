@@ -2,5 +2,5 @@
 from .api import Page, show, to_html, write
 from .load import Source, Sources
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = ["Page", "Source", "Sources", "__version__", "show", "to_html", "write"]   # sorted: ruff RUF022
