@@ -6,7 +6,7 @@ import pytest
 from rdflib import Graph, Namespace, URIRef
 
 import ttl3d
-from ttl3d import api, layout
+from ttl3d import api, cli, layout
 
 EX = Namespace("http://example.org/mem#")
 
@@ -107,3 +107,35 @@ def test_build_page_reports_what_the_cli_prints(library, library_extra):
                            attribute_preds=(), fmt=None, notice=None)
     assert (built.n_nodes, built.n_links, built.layout_mode) == (12, 6, "stress")
     assert built.labels == {"node": True, "edge": True} and "<title>Lib</title>" in built.html
+
+
+def test_write_and_the_cli_produce_the_same_bytes(tmp_path, library, library_extra):
+    via_api = ttl3d.write([library, library_extra], tmp_path / "api.html",
+                          title="Lib", view="2d", color_by="type", attribute_preds=["ex:wrote"])
+    rc = cli.main([str(library), str(library_extra), "-o", str(tmp_path / "cli.html"),
+                   "--title", "Lib", "--view", "2d", "--color-by", "type", "--attribute-preds", "ex:wrote"])
+    assert rc == 0
+    assert via_api.read_bytes() == (tmp_path / "cli.html").read_bytes()
+
+
+def test_the_cli_runs_on_the_shared_builder(tmp_path, library, monkeypatch):
+    # byte identity alone would pass before the refactor; this proves the call
+    seen = {}
+    real = api.build_page
+
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(api, "build_page", spy)
+    assert cli.main([str(library), "-o", str(tmp_path / "lib.html"), "--view", "2d", "--title", ""]) == 0
+    assert seen["view"] == "2d" and seen["title"] is None          # --title "" still means "use the stem"
+    assert "<title>library</title>" in (tmp_path / "lib.html").read_text(encoding="utf-8")
+
+
+def test_the_cli_still_announces_the_stress_layout_on_stderr(tmp_path, library, library_extra, capsys,
+                                                             monkeypatch):
+    monkeypatch.setattr(layout, "PROGRESS_MIN_NODES", 0)
+    assert cli.main([str(library), str(library_extra), "-o", str(tmp_path / "lib.html")]) == 0
+    captured = capsys.readouterr()
+    assert "stress" in captured.err.lower() and captured.out.startswith("12 nodes")

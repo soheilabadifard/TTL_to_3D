@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, graph, layout, load, render
+from . import __version__, api, graph, layout, render
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,32 +61,19 @@ def main(argv: list[str] | None = None) -> int:
     if out.exists() and any(Path(f).exists() and out.samefile(f) for f in args.files):
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
-        ds = load.load_files(args.files, fmt=args.format)
-        extra = graph.resolve_terms([t for arg in args.attribute_preds for t in arg.split(",") if t],
-                                    ds)
-    except (OSError, ValueError) as e:      # LoadError is a ValueError
+        built = api.build_page(
+            args.files, title=args.title or None,       # --title "" meant "the first stem" before; keep it
+            color_by=args.color_by, layout=args.layout, labels=args.labels,
+            view=args.view, lang=args.lang, type_links=args.type_links,
+            attribute_preds=[t for arg in args.attribute_preds for t in arg.split(",") if t],
+            fmt=args.format, notice=lambda message: print(message, file=sys.stderr))
+    except (OSError, ValueError) as e:      # LoadError is a ValueError; an unknown prefix too
         return _fail(e)
-    data = graph.build(ds, color_by=args.color_by, lang=args.lang,
-                       type_links=args.type_links, attribute_preds=extra)
-    mode = layout.choose_layout(len(data["nodes"]), args.layout)
-    if mode == "stress":
-        notice = layout.stress_notice(len(data["nodes"]))
-        if notice:
-            print(notice, file=sys.stderr)
-        ids = [n["id"] for n in data["nodes"]]
-        pos3 = layout.stress_positions(ids, data["links"], dim=3)
-        pos2 = layout.stress_positions(ids, data["links"], dim=2)
-        for n in data["nodes"]:
-            n["x"], n["y"], n["z"] = pos3[n["id"]]
-            n["x2"], n["y2"] = pos2[n["id"]]
-    labels = layout.choose_labels(len(data["nodes"]), len(data["links"]), args.labels)
-    html = render.render_html(data, title=args.title or first,
-                              pinned=(mode == "stress"), labels=labels, view=args.view)
     try:
-        render.write_html(html, out)
+        render.write_html(built.html, out)
     except OSError as e:
         return _fail(e)
-    shown = "+".join(k for k, v in labels.items() if v) or "hover only"
-    print(f'{len(data["nodes"])} nodes, {len(data["links"])} links -> {out} '
-          f'(view: {args.view}, layout: {mode}, labels: {shown})')
+    shown = "+".join(k for k, v in built.labels.items() if v) or "hover only"
+    print(f'{built.n_nodes} nodes, {built.n_links} links -> {out} '
+          f'(view: {args.view}, layout: {built.layout_mode}, labels: {shown})')
     return 0
