@@ -7,7 +7,7 @@
 Options mirror the command line. Errors are raised, never printed.
 
     sources --> load.load --> Dataset --> graph.build --> data --> layout --> render.render_html --> html
-    (paths, Graphs,                                              (stress: positions + notice,
+    (paths, Graphs, Datasets,                                    (stress: positions + notice,
      (name, item), {name: item})                                  force: nothing)
                                      build_page <-- cli.main -- notice -> stderr, summary line, exit code
                                          |
@@ -56,7 +56,7 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
     if color_by not in graph.COLOR_KEYS:
         raise ValueError(f"color_by must be one of {graph.COLOR_KEYS}, got {color_by!r}")
     ds = load.load(sources, fmt)
-    if not ds.stems:
+    if not ds.sources:
         raise ValueError("at least one source is needed")
     preds = list(attribute_preds)
     # URIRef is a str subclass: keep terms as they are, resolve the plain strings like the CLI
@@ -75,7 +75,7 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
             n["x"], n["y"], n["z"] = pos3[n["id"]]
             n["x2"], n["y2"] = pos2[n["id"]]
     flags = _layout.choose_labels(len(data["nodes"]), len(data["links"]), labels)
-    html = _render.render_html(data, title=ds.stems[0] if title is None else title,
+    html = _render.render_html(data, title=ds.sources[0] if title is None else title,
                                pinned=(mode == "stress"), labels=flags, view=view)
     return Built(html, len(data["nodes"]), len(data["links"]), mode, flags)
 
@@ -83,8 +83,9 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
 def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
             labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
             attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None) -> str:
-    """The page as HTML text. `sources`: a path, an rdflib.Graph, a (name, path-or-Graph) pair,
-    or a list of those; a path is named by its stem, a Graph by its pair name or "graph".
+    """The page as HTML text. `sources`: a path, an rdflib.Graph or rdflib.Dataset, a (name, item)
+    pair, or a list of those; a path is named by its stem, a Graph by its pair name or "graph", a
+    Dataset by its pair name or "dataset". A quad file or a Dataset adds one source per named graph.
     `title=None` means the first source's name; an empty string is an empty title (unlike
     `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")
