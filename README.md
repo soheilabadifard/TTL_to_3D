@@ -12,8 +12,9 @@ labels on the edges, a clickable legend, label search, and a detail card for
 every node. The page embeds all of its JavaScript, so it opens from a file,
 works offline, and never sends your data anywhere.
 
-**[Try it in your browser](https://soheilabadifard.github.io/TTL_to_3D/)**: the Solar System demo,
-FOAF, SKOS, PROV-O and the Pizza ontology, each a page ttl3d generated.
+**[Try it in your browser](https://soheilabadifard.github.io/TTL_to_3D/)**: the Solar System demo
+(as two Turtle files, and as one TriG dataset with named graphs), FOAF, SKOS, PROV-O and the
+Pizza ontology, each a page ttl3d generated.
 
 ![ttl3d: orbit the Solar System demo in 3D, filter by legend, open a card, switch to 2D](https://raw.githubusercontent.com/soheilabadifard/TTL_to_3D/main/docs/demo.gif)
 
@@ -93,10 +94,11 @@ notebook behind the badge.
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
 `.owl`, `.jsonld`, `.trig`, `.nq`, ...) through rdflib. A quad format (TriG,
 N-Quads, TriX, JSON-LD with named `@graph` blocks) loads every named graph, and
-each named graph is a source like a file: a legend row when it declares a node or
-is the first to assert a link, named by its prefixed IRI (`ex:planets`, or the
-full IRI when no prefix covers it), while the file's default graph keeps the
-file's name. The same graph IRI in several files is one source.
+each named graph is a source like a file: a legend row of its own, named by its
+prefixed IRI (`ex:planets`, or the full IRI when no prefix covers it; the IRI
+itself is the row's hover text and appears on the cards), while the file's
+default graph keeps the file's name. The same graph IRI in several files is one
+source.
 
 ## What becomes a node, what becomes a link
 
@@ -112,8 +114,9 @@ file's name. The same graph IRI in several files is one source.
   Every other literal lands in the card's property table.
 - Each node remembers the file or named graph that first declares it, in the order
   sources and their graphs first appear; each link remembers the files or graphs
-  asserting it. A file that only adds edges between other files' nodes still owns
-  something visible.
+  asserting it. Every source has a legend row: a file that only adds edges between
+  other files' nodes selects those edges, and a file that only annotates (labels,
+  comments) gets a muted row that says so, since nothing it asserts is drawable.
 - An edge asserted in both directions (`:Luna :orbits :Earth` and `:Earth :hasMoon :Luna`) is one link labelled `orbits ⇄ hasMoon`, without an arrowhead.
 - Labels follow `--lang`: the requested language first, then untagged literals, then anything else; every other label value becomes a synonym on the card, and a `rdfs:comment` that loses to a `skos:definition` still appears in the property table.
 - Namespaces follow the prefixes the inputs bind: an IRI is cut at its last `/` or `#`
@@ -125,13 +128,14 @@ file's name. The same graph IRI in several files is one source.
 ## In the page
 
 - Legend rows filter inclusively: a selected group keeps its own nodes, their
-  direct neighbours, and the endpoints of every edge it asserts.
+  direct neighbours, and the endpoints of every edge it asserts, whether or not
+  another source asserted that edge first.
 - The `3D | 2D` switch rebuilds the picture in the other view. Legend filters, the
   search text and the open card carry over, and in pinned mode each view has its own
   precomputed stress layout. A browser without WebGL opens in 2D and says so.
 - Search dims everything whose label does not match.
-- Click a node for its card: types, source (the file or named graph), namespace, definition, synonyms,
-  properties, incoming and outgoing relations (clickable), and sources.
+- Click a node for its card: types, source (the file, or the named graph with its IRI), namespace,
+  definition, synonyms, properties, incoming and outgoing relations (clickable), and sources.
 - The label toggles rebuild the scene, so a big graph can start without
   sprites and switch them on later.
 - "Free-float physics" releases pinned nodes into the live force layout and

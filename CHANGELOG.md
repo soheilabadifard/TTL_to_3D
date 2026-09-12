@@ -4,6 +4,15 @@
 
 Nothing yet.
 
+## 0.5.0 (2026-09-12)
+
+Every source has a legend row, including a file or named graph that only annotates other sources'
+nodes (its row is muted and its hover text says why), and selecting a row keeps the endpoints of
+every edge that source asserts, not only the edges it asserted first, as the README always said.
+The node card shows the IRI behind a named-graph key under the source name, and legend rows carry
+it as hover text (`DATA.graphs`, one additive key in the page). The demo site gains the Solar System
+as one TriG dataset, and CI builds that page on three operating systems.
+
 ## 0.4.0 (2026-09-12)
 
 Named graphs: TriG and N-Quads files load every graph, and each named graph is a source like a
