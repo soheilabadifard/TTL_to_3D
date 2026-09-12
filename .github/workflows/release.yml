@@ -1,0 +1,59 @@
+name: release
+
+# A merge to main that changes ttl3d/__init__.py's version tags it (vX.Y.Z), publishes the GitHub
+# release with that version's CHANGELOG section as notes, and calls publish.yml, which puts the
+# package on PyPI and attaches the files. Zenodo archives the release through its webhook. A
+# version that is already tagged is left alone, so a merge without a bump is a no-op.
+on:
+  push:
+    branches: [main]
+    paths: [ttl3d/__init__.py]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      new: ${{ steps.version.outputs.new }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: version
+        name: the version in the package, and whether it is tagged yet
+        run: |
+          v=$(python3 -c "import re, pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('ttl3d/__init__.py').read_text(encoding='utf-8')).group(1))")
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin "refs/tags/v$v" | grep -q .; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
+          echo "version $v, tagged already: $(git ls-remote --tags origin "refs/tags/v$v" | grep -c .)"
+      - if: steps.version.outputs.new == 'true'
+        name: the changelog has a section for this version
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: python3 tools/release_notes.py "${TAG#v}" > notes.md && test -s notes.md
+      - if: steps.version.outputs.new == 'true'
+        name: tag the merge and publish the GitHub release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "ttl3d ${TAG#v}"
+          git push origin "$TAG"
+          gh release create "$TAG" --title "ttl3d ${TAG#v}" --notes-file notes.md --verify-tag
+
+  publish:
+    needs: tag
+    if: needs.tag.outputs.new == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    permissions:
+      id-token: write
+      contents: write

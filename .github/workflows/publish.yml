@@ -1,8 +1,9 @@
 name: publish
 
-# Runs when a GitHub release is published, or by hand for an existing tag. Publishes to PyPI
-# through trusted publishing (the "pypi" environment; no token stored) and attaches the
-# built files to the release.
+# Runs when a GitHub release is published by hand, by hand for an existing tag, or called by
+# release.yml after it tagged a merge (a release the workflow token creates fires no `release`
+# event, so the caller runs this directly). Publishes to PyPI through trusted publishing (the
+# "pypi" environment; no token stored) and attaches the built files to the release.
 on:
   release:
     types: [published]
@@ -11,6 +12,12 @@ on:
       tag:
         description: "existing tag to publish, e.g. v0.2.2"
         required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: "the tag release.yml just created"
+        required: true
+        type: string
 
 jobs:
   build:
