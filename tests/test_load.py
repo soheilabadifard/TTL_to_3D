@@ -128,3 +128,32 @@ def test_a_pair_or_mapping_key_that_is_not_a_str_raises_type_error():
         load.load((1, _mem_graph()))
     with pytest.raises(TypeError, match="pair"):
         load.load({1: _mem_graph()})
+
+
+def test_split_iri_cuts_at_the_last_hash_or_slash_when_that_namespace_is_bound_or_nothing_is():
+    p = {"http://example.org/g#": "ex"}
+    assert load.split_iri("http://example.org/g#Book", p) == ("http://example.org/g#", "Book")
+    assert load.split_iri("http://example.org/g/Book", {}) == ("http://example.org/g/", "Book")
+    assert load.split_iri("urn:x:y", {}) == ("", "urn:x:y")                    # no separator, nothing bound
+    assert load.split_iri("http://example.org/g/", p) == ("http://example.org/g/", "")   # empty local part
+
+
+def test_split_iri_falls_back_to_the_longest_bound_namespace_the_iri_extends():
+    # the cut namespace http://example.org/ is unbound here, so rule 2 applies and the longest match wins
+    p = {"urn:graphs:": "g", "http://example.org/g-": "ex", "http://example.org/g": "short"}
+    assert load.split_iri("urn:graphs:planets", p) == ("urn:graphs:", "planets")
+    assert load.split_iri("http://example.org/g-Book", p) == ("http://example.org/g-", "Book")
+    assert load.split_iri("urn:graphs:", p) == ("", "urn:graphs:")
+
+
+def test_a_bound_cut_namespace_wins_over_a_shorter_bound_one():
+    p = {"http://example.org/": "root", "http://example.org/lib#": "ex"}
+    assert load.split_iri("http://example.org/lib#Book", p) == ("http://example.org/lib#", "Book")
+    assert load.local("http://example.org/lib#Book", p) == "Book"
+    assert load.namespace_of("http://example.org/lib#Book", p) == "http://example.org/lib#"
+
+
+def test_local_and_namespace_of_keep_their_old_results_without_prefixes():
+    assert load.local("http://e/a#b") == "b" and load.namespace_of("http://e/a#b") == "http://e/a#"
+    assert load.local("http://e/a/") == "http://e/a/"  # empty local part is the IRI itself
+    assert load.local("urn:x") == "urn:x" and load.namespace_of("urn:x") == ""

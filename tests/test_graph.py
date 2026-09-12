@@ -276,3 +276,12 @@ def test_a_link_asserted_by_two_files_lists_both(tmp_path):
             "@prefix ex: <http://example.org/f#> .\nex:a ex:p ex:b .\n", encoding="utf-8")
     data = build(tmp_path / "first.ttl", tmp_path / "second.ttl")
     assert data["links"][0]["files"] == ["first", "second"] and data["links"][0]["group"] == "first"
+
+
+def test_a_bound_prefix_shortens_urn_namespaces_for_groups_and_labels(tmp_path):
+    ttl = tmp_path / "urn.ttl"
+    ttl.write_text("@prefix g: <urn:graphs:> .\ng:a g:p g:b .\n", encoding="utf-8")
+    data = build(ttl, color_by="namespace")
+    assert data["groups"] == ["g"] and {n["ns"] for n in data["nodes"]} == {"g"}
+    assert sorted(n["label"] for n in data["nodes"]) == ["a", "b"]           # local names, not the whole URN
+    assert data["links"][0]["predicates"] == ["p"]

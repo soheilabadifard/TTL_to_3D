@@ -35,6 +35,29 @@ def _unique_key(stem: str, taken: dict) -> str:
     return key
 
 
+def split_iri(iri, prefixes: Mapping[str, str] | None = None) -> tuple[str, str]:
+    """(namespace, local name) of an IRI. Cut at the last '#' or '/' when that namespace is bound,
+    or when nothing else matches; otherwise at the longest bound namespace the IRI starts with and
+    extends, so `urn:graphs:planets` with `ex: <urn:graphs:>` splits as ('urn:graphs:', 'planets').
+    Legend keys, node namespaces and local names all go through here, so they always agree."""
+    s = str(iri)
+    ns = s[:max(s.rfind("#"), s.rfind("/")) + 1]
+    if prefixes and ns not in prefixes:
+        bound = [b for b in prefixes if len(b) < len(s) and s.startswith(b)]
+        if bound:
+            ns = max(bound, key=len)
+    return ns, s[len(ns):]
+
+
+def namespace_of(u, prefixes: Mapping[str, str] | None = None) -> str:
+    return split_iri(u, prefixes)[0]
+
+
+def local(u, prefixes: Mapping[str, str] | None = None) -> str:
+    """The local name; the whole IRI when nothing follows the namespace (`http://e/a/`, `urn:x`)."""
+    return split_iri(u, prefixes)[1] or str(u)
+
+
 def _parse(f: Path, fmt: str | None = None) -> Graph:
     """Parse one file. Without an explicit format the extension decides; if that
     parser rejects the file, try Turtle once (Turtle saved as .owl is common)."""
