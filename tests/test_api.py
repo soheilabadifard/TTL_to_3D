@@ -150,10 +150,14 @@ def test_show_returns_a_page_that_notebooks_render_as_a_sandboxed_iframe(library
 
 
 def test_the_iframe_escapes_a_page_that_could_break_out_of_the_attribute(library):
+    import html as _html
     page = ttl3d.show(library, title='Say "hi" </iframe><script>')
     tag = page._repr_html_()
     assert tag.count("</iframe>") == 1 and "<script" not in tag[len("<iframe srcdoc=\""):]
-    assert "&quot;hi&quot;" in tag and "&lt;/iframe&gt;" in tag
+    srcdoc = tag[len('<iframe srcdoc="'):tag.index('" sandbox=')]
+    assert '"' not in srcdoc and "<" not in srcdoc            # nothing can end the attribute or open a tag
+    # the browser unescapes the attribute and gets the exact page back
+    assert _html.unescape(srcdoc) == page.html
 
 
 def test_page_repr_is_short_and_write_writes_the_html(tmp_path, library):

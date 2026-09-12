@@ -16,6 +16,7 @@ Options mirror the command line. Errors are raised, never printed.
 """
 from __future__ import annotations
 
+import html as _html
 import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -104,10 +105,10 @@ class Page:
     height: int = 600
 
     def _repr_html_(self) -> str:
-        # Escape for the srcdoc attribute: avoid double-escaping entities already in self.html.
-        # Replace unsafe characters but not & (which is already part of entities like &quot;).
-        escaped = self.html.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
-        return (f'<iframe srcdoc="{escaped}" sandbox="allow-scripts" '
+        # quote=True escapes " as well as < > &, so no page content can end the attribute;
+        # sandbox without allow-same-origin: the page runs its JavaScript and WebGL and
+        # cannot reach the notebook's origin, which is all it needs
+        return (f'<iframe srcdoc="{_html.escape(self.html, quote=True)}" sandbox="allow-scripts" '
                 f'style="width:100%;height:{int(self.height)}px;border:0" title="ttl3d"></iframe>')
 
     def write(self, out) -> Path:
