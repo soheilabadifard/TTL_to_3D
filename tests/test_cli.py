@@ -1,11 +1,14 @@
 """ttl3d.cli: the command line entry point."""
 import json
 import os
+import random
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
+from rdflib import URIRef
 
 from ttl3d import cli
 
@@ -117,14 +120,18 @@ SOLAR = ("examples/solar-system.ttl", "examples/solar-system-missions.ttl")
 TRIG = ("tests/fixtures/library.trig",)
 
 
-@pytest.mark.parametrize(("view", "inputs"), [("3d", SOLAR), ("2d", SOLAR), ("3d", TRIG)],
-                         ids=["solar-3d", "solar-2d", "trig-3d"])
-def test_cli_output_is_identical_across_processes(tmp_path, view, inputs):
+FOCUS = ("--focus", ":Earth", "--hops", "2")
+
+
+@pytest.mark.parametrize(("view", "inputs", "extra"),
+                         [("3d", SOLAR, ()), ("2d", SOLAR, ()), ("3d", TRIG, ()), ("3d", SOLAR, FOCUS)],
+                         ids=["solar-3d", "solar-2d", "trig-3d", "solar-focus"])
+def test_cli_output_is_identical_across_processes(tmp_path, view, inputs, extra):
     pages = []
     for seed in ("1", "2"):
         out = tmp_path / f"page-{seed}.html"
         r = subprocess.run([sys.executable, "-m", "ttl3d", *(str(REPO / p) for p in inputs),
-                            "-o", str(out), "--view", view],
+                            "-o", str(out), "--view", view, *extra],
                            capture_output=True, text=True, cwd=REPO, check=False,
                            env={**os.environ, "PYTHONHASHSEED": seed})
         assert r.returncode == 0, r.stderr
@@ -265,3 +272,78 @@ def test_bad_standard_input_is_a_one_line_error_naming_stdin(tmp_path):
 def test_standard_input_can_be_given_only_once(tmp_path, capsys):
     assert cli.main(["-", "-", "-o", str(tmp_path / "x.html")]) == 1     # fails before reading stdin
     assert capsys.readouterr().err == "ttl3d: error: standard input can be given only once\n"
+
+
+def test_focus_and_schema_slice_the_page_and_announce_it(tmp_path, library, library_extra, capsys):
+    out = tmp_path / "s.html"
+    both = [str(library), str(library_extra)]
+    assert cli.main([*both, "--focus", "ex:Dune", "-o", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("3 nodes, 2 links")
+    assert captured.err == "kept 3 of 12 nodes (focus ex:Dune, 1 hop)\n"
+    assert cli.main([*both, "--focus", "http://example.org/library#Dune,ex:Asimov", "--focus", "ex:Book",
+                     "--hops", "0", "-o", str(out)]) == 0
+    assert capsys.readouterr().out.startswith("3 nodes, 0 links")     # a union; no links at hop 0
+    assert cli.main([*both, "--schema", "-o", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("5 nodes, 3 links")
+    assert captured.err == "kept 5 of 12 nodes (schema only)\n"
+    # library-extra owns no schema term, so it has no legend row here
+    assert '"groups": ["library"]' in out.read_text(encoding="utf-8")
+
+
+def test_hops_needs_focus_and_bad_focus_or_hops_are_one_line_errors(tmp_path, library, capsys):
+    out = tmp_path / "s.html"
+    assert cli.main([str(library), "--hops", "2", "-o", str(out)]) == 1
+    assert capsys.readouterr().err == "ttl3d: error: --hops needs --focus\n"
+    assert cli.main([str(library), "--focus", "ex:Nope", "-o", str(out)]) == 1
+    assert capsys.readouterr().err == ("ttl3d: error: focus <http://example.org/library#Nope> "
+                                       "is not a node in the data\n")
+    assert cli.main([str(library), "--focus", "ex:Dune", "--hops", "-1", "-o", str(out)]) == 1
+    assert capsys.readouterr().err.startswith("ttl3d: error: hops must be a non-negative integer")
+    assert not out.exists()
+
+
+def test_a_bad_hop_count_is_refused_before_standard_input_is_read(tmp_path):
+    # a pipe that would block forever if the CLI read it first: the error must arrive without a parse
+    r = subprocess.run([sys.executable, "-m", "ttl3d", "-", "--focus", "ex:a", "--hops", "-1",
+                        "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=30)
+    assert r.returncode == 1 and r.stderr.startswith("ttl3d: error: hops must be a non-negative integer")
+
+
+def _generated(tmp_path, subjects=2000, links=9):
+    """A seeded random graph: every subject has a label and `links` outgoing edges."""
+    rnd = random.Random(7)
+    lines = []
+    for i in range(subjects):
+        lines.append(f'<http://g/s{i}> <http://www.w3.org/2000/01/rdf-schema#label> "s {i}" .')
+        for k in range(links):
+            lines.append(f'<http://g/s{i}> <http://g/p{k % 3}> <http://g/s{rnd.randrange(subjects)}> .')
+    nt = tmp_path / "gen.nt"
+    nt.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return nt
+
+
+def test_a_two_hop_slice_of_a_generated_graph_is_identical_across_processes(tmp_path):
+    nt = _generated(tmp_path)
+    pages = []
+    for seed in ("1", "2"):
+        out = tmp_path / f"gen-{seed}.html"
+        r = subprocess.run([sys.executable, "-m", "ttl3d", str(nt), "--focus", "<http://g/s0>", "--hops", "2",
+                            "--layout", "force", "-o", str(out)], capture_output=True, text=True, cwd=REPO,
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed})
+        assert r.returncode == 0, r.stderr
+        assert r.stderr.startswith("kept ")
+        assert r.stderr.endswith(" of 2000 nodes (focus http://g/s0, 2 hops)\n")
+        pages.append(out.read_bytes())
+    assert pages[0] == pages[1]
+
+
+def test_a_two_hop_slice_of_twenty_thousand_triples_takes_well_under_two_seconds(tmp_path):
+    from ttl3d import graph, load, slice
+    ds = load.load_files([_generated(tmp_path)])
+    start = time.perf_counter()
+    data = graph.build(slice.select(ds, focus=[URIRef("http://g/s0")], hops=2).dataset)
+    assert time.perf_counter() - start < 2.0                                  # about ten times what it takes
+    assert 100 < len(data["nodes"]) < 2000
