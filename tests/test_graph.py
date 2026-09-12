@@ -294,7 +294,8 @@ def test_a_named_graph_owns_its_nodes_and_edges_like_a_file(library_trig):
     data = build(library_trig)
     assert data["groups"] == [":catalogue", "ex:extra", "library"]
     assert node(data, "Book")["file"] == "library"                 # declared in the default graph
-    assert node(data, "Dune")["file"] == ":catalogue"              # the repeated label in ex:extra does not steal it
+    # the repeated "Dune" label in ex:extra does not steal the node from :catalogue
+    assert node(data, "Dune")["file"] == ":catalogue"
     assert node(data, "Asimov")["file"] == "ex:extra"
     link = next(l for l in data["links"] if l["predicates"] == ["relatedTo"])
     assert link["files"] == ["ex:extra"] and link["group"] == "ex:extra"
