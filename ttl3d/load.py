@@ -133,18 +133,31 @@ def _contexts(rds: RdfDataset):
 
 
 def _split(rds: RdfDataset) -> tuple[Graph, dict[URIRef, Graph]]:
-    """A parsed dataset as (default graph, {graph IRI: graph}). Graphs named by a blank node have
-    no stable name and join the default graph."""
-    default = Graph()
+    """A parsed dataset as (default graph, {graph IRI: graph}). The default graph is the parsed
+    store's own context, not a copy, so a plain Turtle file costs one copy (into `merged`) as
+    before; named graphs are fresh copies because same-IRI merges write into them. Graphs named
+    by a blank node have no stable name and are folded into a fresh default graph."""
+    default: Graph | None = None
+    folded: list[Graph] = []
     named: dict[URIRef, Graph] = {}
     for ctx in _contexts(rds):
         ident = ctx.identifier
-        if isinstance(ident, URIRef) and ident != DATASET_DEFAULT_GRAPH_ID:
+        if ident == DATASET_DEFAULT_GRAPH_ID:
+            default = ctx
+        elif isinstance(ident, URIRef):
             target = named.setdefault(ident, Graph())
+            for triple in ctx:
+                target.add(triple)
         else:
-            target = default
-        for triple in ctx:
-            target.add(triple)
+            folded.append(ctx)
+    if default is None:
+        default = Graph()
+    if folded:
+        together = Graph()
+        for g in (default, *folded):
+            for triple in g:
+                together.add(triple)
+        default = together
     return default, named
 
 
@@ -195,7 +208,8 @@ def load(sources: Sources, fmt: str | None = None) -> Dataset:
 
     A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph", an
     rdflib.Dataset by its pair or "dataset"; a duplicate name gets ~2, ~3. A Graph is used as it
-    is, never copied. A quad source (a TriG, N-Quads, TriX or JSON-LD file, or an rdflib.Dataset)
+    is, never copied; a quad source's default graph is used as is too, its named graphs are
+    copied. A quad source (a TriG, N-Quads, TriX or JSON-LD file, or an rdflib.Dataset)
     contributes its default graph under the source name and every named graph under its prefixed
     IRI (`ex:planets`); the same graph IRI in several sources is one key, sitting where the graph
     first appeared. `fmt` forces one parser for every path, as --format does."""
