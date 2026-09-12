@@ -95,6 +95,8 @@ def _parsed(name: str, fmt: str, parse) -> RdfDataset:
     try:
         with warnings.catch_warnings():
             # rdflib 7.6's Dataset.parse reads its own deprecated default_context and warns
+            # (catch_warnings edits the process-wide filter for the parse's duration; not
+            # thread-safe, as Python documents)
             warnings.simplefilter("ignore", DeprecationWarning)
             parse(rds, fmt)
     except Exception as e:  # every rdflib parser plugin raises its own class

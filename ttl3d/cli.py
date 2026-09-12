@@ -15,7 +15,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("files", nargs="+",
                    help="RDF files, or - for standard input; the format is guessed from the extension")
     p.add_argument("-o", "--out",
-                   help="output HTML path (default: <first file stem>-<view>.html in the current directory)")
+                   help="output HTML path (default: <first source name>-<view>.html in the current "
+                        "directory; stdin for -)")
     p.add_argument("--color-by", choices=graph.COLOR_KEYS, default="file",
                    help="what the node colors and legend mean (default: file; a named graph of a TriG or "
                         "N-Quads file counts as a file)")
@@ -27,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
                         f"edges up to {layout.LABEL_MAX_LINKS}); hover = tooltips only")
     p.add_argument("--view", choices=render.VIEWS, default="3d",
                    help="starting view; the page can switch between 3d and 2d (default: 3d)")
-    p.add_argument("--title", help="page title (default: first file stem)")
+    p.add_argument("--title", help="page title (default: the first source's name; stdin for -)")
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
                         "untagged literals rank next, other languages become synonyms"

@@ -252,6 +252,18 @@ def test_two_graph_iris_that_shorten_alike_get_distinct_keys(tmp_path):
     assert ds.named == {"ex:g": URIRef("http://example.org/a#g"), "ex:g~2": URIRef("http://example.org/b#g")}
 
 
+def test_two_alike_graph_iris_in_one_source_are_ordered_by_iri_not_hash_order(tmp_path):
+    # file A binds p: to one namespace, file B binds p: to another and holds a graph in each, so
+    # both of B's graphs shorten to p:g; the (curie, IRI) sort decides which one is p:g
+    (tmp_path / "a.ttl").write_text("@prefix p: <http://x/1#> .\np:s p:q p:o .\n", encoding="utf-8")
+    (tmp_path / "b.trig").write_text("@prefix p: <http://x/2#> .\n"
+                                     "<http://x/2#g> { p:a p:q p:b . }\n<http://x/1#g> { p:c p:q p:d . }\n",
+                                     encoding="utf-8")
+    ds = load.load_files([tmp_path / "a.ttl", tmp_path / "b.trig"])
+    assert ds.stems == ["a", "p:g", "p:g~2"]
+    assert ds.named == {"p:g": URIRef("http://x/1#g"), "p:g~2": URIRef("http://x/2#g")}
+
+
 def test_a_source_name_and_a_graph_key_that_collide_get_a_suffix_whichever_comes_second(tmp_path):
     trig = tmp_path / "a.trig"
     trig.write_text("@prefix ex: <http://example.org/a#> .\nex:g { ex:s ex:p ex:o . }\n", encoding="utf-8")

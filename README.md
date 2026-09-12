@@ -111,8 +111,9 @@ file's name. The same graph IRI in several files is one source.
   Definition: `skos:definition`, else `rdfs:comment`, else `dcterms:description`.
   Every other literal lands in the card's property table.
 - Each node remembers the file or named graph that first declares it, in the order
-  sources and their graphs first appear; each link remembers the files or graphs asserting it. A file that only adds edges between other files' nodes
-  still owns something visible.
+  sources and their graphs first appear; each link remembers the files or graphs
+  asserting it. A file that only adds edges between other files' nodes still owns
+  something visible.
 - An edge asserted in both directions (`:Luna :orbits :Earth` and `:Earth :hasMoon :Luna`) is one link labelled `orbits ⇄ hasMoon`, without an arrowhead.
 - Labels follow `--lang`: the requested language first, then untagged literals, then anything else; every other label value becomes a synonym on the card, and a `rdfs:comment` that loses to a `skos:definition` still appears in the property table.
 - Namespaces follow the prefixes the inputs bind: an IRI is cut at its last `/` or `#`
