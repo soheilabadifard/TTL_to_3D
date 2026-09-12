@@ -243,3 +243,8 @@ def test_inlined_viewer_assets_carry_lf_newlines_only():
     pkg = Path(render.__file__).parent
     for name in ("viewer.js", "viewer-3d.js", "viewer-2d.js", "viewer.css", "vendor/fg-bundle.min.js"):
         assert b"\r" not in (pkg / name).read_bytes(), name
+
+
+def test_the_card_calls_the_owning_file_or_graph_a_source():
+    js = render.viewer_source()
+    assert "<td>source</td><td>${esc(n.file)}</td>" in js and "<td>file</td>" not in js
