@@ -2,6 +2,7 @@
 (`pip install -e .[browser] && playwright install chromium`). TTL3D_BROWSER=firefox or webkit
 runs the same tests on another engine (`playwright install firefox webkit`)."""
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -368,6 +369,82 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
             assert page.evaluate("DATA.nodes.every(n => n.__threeObj && n.__threeObj.parent)")  # rebuilt
             assert page.evaluate("document.querySelectorAll('#graph canvas').length") == 1
             assert "drag to rotate" in page.evaluate("document.getElementById('nav').textContent")
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_the_card_of_a_node_from_a_named_graph_shows_the_graph_iri(tmp_path):
+    out = tmp_path / "trig.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.trig"),
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            assert page.get_attribute(".row.grp[data-group=':catalogue']", "title") == \
+                "http://example.org/graphs/catalogue"
+            page.evaluate("showNode(Graph.graphData().nodes.find(n => n.label === 'Dune'))")
+            text = page.inner_text("#detail")
+            assert ":catalogue" in text and "http://example.org/graphs/catalogue" in text
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_selecting_a_re_asserting_source_keeps_its_edge_and_an_annotation_only_source_dims_all(tmp_path):
+    prefix = "@prefix ex: <http://example.org/library#> .\n"
+    (tmp_path / "again.ttl").write_text(prefix + "ex:Herbert ex:wrote ex:Dune .\n", encoding="utf-8")
+    (tmp_path / "notes.ttl").write_text(prefix + "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                                        'ex:Dune rdfs:comment "Annotated elsewhere." .\n', encoding="utf-8")
+    out = tmp_path / "three.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.ttl"),
+                        str(tmp_path / "again.ttl"), str(tmp_path / "notes.ttl"), "-o", str(out)],
+                       capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            assert page.evaluate("document.querySelectorAll('.row.grp').length") == 3   # every source
+            page.click(".row.grp[data-group='again']")
+            kept = page.evaluate("DATA.nodes.filter(n => !n._dim).map(n => n.label).sort()")
+            assert kept == ["Dune", "Frank Herbert"]           # the endpoints of the edge `again` re-asserts
+            page.click(".row.grp[data-group='again']")
+            page.click(".row.grp[data-group='notes']")
+            assert page.evaluate("DATA.nodes.filter(n => !n._dim).length") == 0   # nothing drawable
+            assert page.evaluate("document.querySelector('.row.grp[data-group=\"notes\"]')"
+                                 ".classList.contains('annot')")
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_type_mode_selection_ignores_a_source_whose_name_matches_a_type(tmp_path):
+    # a file named like a class: in type mode the "Book" row selects the Book-typed nodes and their
+    # neighbours, never every edge the file Book.ttl asserts (the Person class is neither)
+    shutil.copy(REPO / "tests" / "fixtures" / "library.ttl", tmp_path / "Book.ttl")
+    out = tmp_path / "book.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(tmp_path / "Book.ttl"), "--color-by", "type",
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            page.click(".row.grp[data-group='Book']")
+            assert page.evaluate("DATA.nodes.find(n => n.label === 'Person')._dim") is True
+            assert page.evaluate("DATA.nodes.find(n => n.label === 'Dune')._dim") is False
         finally:
             browser.close()
     assert errors == []

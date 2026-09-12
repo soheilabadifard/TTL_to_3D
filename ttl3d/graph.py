@@ -6,9 +6,11 @@ Links are IRI-to-IRI triples whose predicate describes a relation rather than
 an attribute (rdf:type, imports and provenance go to the node card instead).
 Parallel edges collapse into one link listing every predicate; an edge
 asserted in both directions is one link whose `reverse` list holds the
-predicates pointing back. Each node remembers the file that first declares
-it; each link remembers the file(s) asserting it, so a file that only adds
-edges between other files' nodes still owns something visible.
+predicates pointing back. Each node remembers the source (file or named graph)
+that first declares it; each link remembers the source(s) asserting it. In
+file mode every source is a legend group, even one that owns no node and
+asserts no link, and the result carries `graphs`, the IRI behind each
+named-graph key, for the card and the legend.
 
 A node's label is chosen by preference tier: the requested `--lang` language
 first, then untagged literals, then any other language, alphabetical within
@@ -185,5 +187,6 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     groups = {n["group"] for n in nodes}
     if color_by == "file":
-        groups |= {l["group"] for l in links}
-    return {"nodes": nodes, "links": links, "groups": sorted(groups), "color_by": color_by}
+        groups |= set(ds.graphs)         # every source gets a legend row (link groups are keys too)
+    return {"nodes": nodes, "links": links, "groups": sorted(groups), "color_by": color_by,
+            "graphs": {key: str(iri) for key, iri in ds.named.items()}}   # legend key -> named-graph IRI

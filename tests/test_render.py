@@ -247,4 +247,69 @@ def test_inlined_viewer_assets_carry_lf_newlines_only():
 
 def test_the_card_calls_the_owning_file_or_graph_a_source():
     js = render.viewer_source()
-    assert "<td>source</td><td>${esc(n.file)}</td>" in js and "<td>file</td>" not in js
+    assert "<td>source</td><td>${esc(n.file)}" in js and "<td>file</td>" not in js
+
+
+def test_named_graph_iris_reach_the_page_and_title_their_legend_rows(library_trig):
+    trig = graph.build(load.load_files([library_trig]))
+    page = render.render_html(trig, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert '"graphs": {' in page and "graphs/catalogue" in page                   # DATA.graphs
+    assert 'data-group=":catalogue" title="http://example.org/graphs/catalogue"' in page
+    assert 'data-group="library"><span' in page                                    # a file key: no title
+
+
+def test_the_card_shows_the_graph_iri_under_the_source_key():
+    js = render.viewer_source()
+    assert "DATA.graphs[n.file]" in js
+    assert '<div class="iri">${esc(iri)}</div>' in js
+
+
+def test_group_counts_credit_every_asserting_source_with_its_links(tmp_path):
+    for name in ("first", "second"):
+        (tmp_path / f"{name}.ttl").write_text("@prefix ex: <http://example.org/f#> .\nex:a ex:p ex:b .\n",
+                                              encoding="utf-8")
+    data = graph.build(load.load_files([tmp_path / "first.ttl", tmp_path / "second.ttl"]))
+    assert render.group_counts(data) == {"first": 3, "second": 1}     # two nodes and a link; the same link
+
+
+def test_an_annotation_only_source_gets_a_muted_legend_row_that_explains_itself(tmp_path, library):
+    notes = tmp_path / "notes.ttl"
+    notes.write_text("@prefix ex: <http://example.org/library#> .\n"
+                     "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                     'ex:Dune rdfs:comment "Annotated elsewhere." .\n', encoding="utf-8")
+    data = graph.build(load.load_files([library, notes]))
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert ('class="row grp annot" data-group="notes" '
+            'title="declares no node and asserts no edge; what it adds shows on the cards"') in page
+    assert 'class="row grp" data-group="library"><span' in page
+
+
+def test_the_filter_keeps_the_edges_every_selected_source_asserts():
+    js = render.viewer_source()
+    assert "const assertedBy = l => CONFIG.colorBy === 'file' && l.files.some(f => activeGroups.has(f))" in js
+    assert js.count("assertedBy(l)") == 2                               # edgeKeep and grpLink
+    assert "activeGroups.has(l.group)" not in js
+
+
+def test_annotation_only_sources_take_no_palette_slot_and_never_fall_into_other():
+    groups = [f"g{i:02d}" for i in range(12)] + ["notes"]     # twelve real sources plus one annotator
+    counts = {g: 12 - i for i, g in enumerate(groups[:12])}
+    top, rest = render.rank_groups(groups, counts)
+    assert top == set(groups[:12]) and rest == []                     # the twelve keep their colours
+    colors = render.assign_colors(groups, counts)
+    assert "notes" not in colors                                      # nothing of its own to colour
+    data = {"nodes": [{"id": g, "label": g, "group": g, "file": g} for g in groups[:12]],
+            "links": [], "groups": sorted(groups), "color_by": "file", "graphs": {}}
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert 'class="row grp annot" data-group="notes"' in page and "other (" not in page
+
+
+def test_a_named_graph_that_only_annotates_gets_both_hints_in_its_title(tmp_path, library):
+    trig = tmp_path / "notes.trig"
+    trig.write_text("@prefix ex: <http://example.org/library#> .\n"
+                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                    'ex:notes { ex:Dune rdfs:comment "Annotated elsewhere." . }\n', encoding="utf-8")
+    data = graph.build(load.load_files([library, trig]))
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert ('class="row grp annot" data-group="ex:notes" title="http://example.org/library#notes. '
+            'declares no node and asserts no edge; what it adds shows on the cards"') in page

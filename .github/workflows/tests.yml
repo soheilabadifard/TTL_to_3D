@@ -73,6 +73,7 @@ jobs:
           ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl -o pages/solar-3d.html
           ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl --view 2d -o pages/solar-2d.html
           ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl --layout force --color-by type -o pages/solar-force.html
+          ttl3d examples/solar-system.trig -o pages/solar-trig.html
       - uses: actions/upload-artifact@v7
         with:
           name: pages-${{ matrix.os }}

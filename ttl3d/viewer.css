@@ -12,6 +12,7 @@
              user-select:none; word-break:break-all; }
   .row.grp:hover { background:#eef1f6; }
   .row.grp.active { background:#e2e8f2; font-weight:600; }
+  .row.grp.annot { color:#6b7280; font-style:italic; }   /* a source with nothing drawable of its own */
   #panel.filtered .row.grp:not(.active) { opacity:0.45; }
   .dot { width:10px; height:10px; border-radius:50%; display:inline-block; flex:none; }
   #q { width:100%; box-sizing:border-box; margin-top:8px; padding:4px 6px;
