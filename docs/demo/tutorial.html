@@ -61,6 +61,16 @@ The nodes and links merge into one graph, the legend shows which file declared e
 row on a card names the files asserting it. That is the case ttl3d was written for, and the
 <a href="solar-system.html">Solar System demo</a> shows it with two files.</p>
 
+<h2>From Python</h2>
+<p>The same pipeline is a function call, and the options are the command line's:</p>
+<pre><code>import rdflib, ttl3d
+
+g = rdflib.Graph().parse("pizza.owl")
+ttl3d.write(("pizza", g), "pizza.html", color_by="type")   # a file
+ttl3d.show(("pizza", g))                                    # inline, as the last line of a notebook cell</code></pre>
+<p>Sources are file paths, <code>rdflib.Graph</code> objects, <code>(name, source)</code> pairs or a
+<code>{name: source}</code> mapping, in any mix. <a href="https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb">Open the example notebook in Colab</a>.</p>
+
 <h2>Limits</h2>
 <ul>
   <li>Blank nodes are skipped, so OWL restrictions and RDF lists do not appear as nodes.</li>

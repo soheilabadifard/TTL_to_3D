@@ -1,6 +1,16 @@
 # TODOS
 
-Nothing open.
+## Open
+
+- **Inputs after the Python API** (ranked 2026-09-11; each is its own spec and plan):
+  1. Named-graph formats (TriG, N-Quads): parse into an rdflib Dataset and treat each named graph
+     the way a file is treated in the legend. Small.
+  2. Slicing a big graph at build time (a focus IRI with a hop count, schema-only): what makes a
+     knowledge graph of millions of triples drawable. Medium; pairs with 3.
+  3. SPARQL endpoint input (a CONSTRUCT query rendered directly): build time only, never in the
+     page; needs authentication, timeouts and a stubbed endpoint in tests. Medium.
+  4. Reading from standard input: tiny; ride along with 1 or 3.
+  5. CSV edge lists and property graphs: a column-to-RDF mapping language of its own; last.
 
 ## Completed
 

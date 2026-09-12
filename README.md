@@ -50,6 +50,27 @@ which file asserted each edge.
 
 Without installing, run the module from a clone: `python -m ttl3d ...`.
 
+## Python and notebooks
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb)
+
+The same pipeline is a function call. Sources are file paths, `rdflib.Graph` objects,
+`(name, source)` pairs or a `{name: source}` mapping, in any mix; the options are the command line's.
+
+```python
+import rdflib, ttl3d
+
+g = rdflib.Graph().parse("solar-system.ttl")
+ttl3d.write(["solar-system.ttl", "solar-system-missions.ttl"], "solar.html", view="2d")
+html = ttl3d.to_html(("planets", g), color_by="type")        # the page as a string
+ttl3d.show(("planets", g), height=500)                       # last line of a notebook cell: shown inline
+```
+
+`show` returns a page that Jupyter, JupyterLab, VS Code and Colab display as a sandboxed iframe
+with the whole page inside, so nothing is written and no server is needed; each output stores
+about 1.9 MB in the notebook. Errors are raised, never printed. `examples/ttl3d.ipynb` is the
+notebook behind the badge.
+
 ## Options
 
 | Option | Values | Meaning |

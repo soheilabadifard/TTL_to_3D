@@ -4,6 +4,11 @@
 
 Releases are archived on Zenodo; `CITATION.cff` and the README carry the DOI.
 
+A Python entry point: `ttl3d.to_html`, `ttl3d.write` and `ttl3d.show` take file paths and
+in-memory rdflib graphs, named through pairs or a mapping, with the command line's options;
+`show` displays the page inline in notebooks. The command line runs on the same code path.
+An example notebook with an Open-in-Colab badge.
+
 ## 0.2.3 (2026-09-11)
 
 Published on PyPI (`pip install ttl3d`) by a release workflow with trusted
