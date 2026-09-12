@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from rdflib import URIRef
+from rdflib import Literal, URIRef
+from rdflib.namespace import OWL, RDF
 
 from ttl3d import graph, load
 
@@ -350,3 +351,18 @@ def test_a_source_that_only_annotates_still_gets_a_legend_group_in_file_mode(tmp
     assert data["groups"] == ["library", "notes"]                     # every source is a legend row
     assert all(n["file"] == "library" for n in data["nodes"])         # although it owns no node
     assert "notes" not in build(library, _notes(tmp_path), color_by="type")["groups"]
+
+
+def test_rules_decide_nodes_and_links_the_way_build_does(library):
+    ds = load.load_files([library])
+    rules = graph.Rules.of(ds.merged)
+    assert rules.eligible(URIRef(EX + "Dune"))
+    assert not rules.eligible(URIRef("http://example.org/library"))          # the owl:Ontology header
+    assert not rules.eligible(OWL.Thing) and not rules.eligible(Literal("x"))
+    assert rules.is_link(URIRef(EX + "Herbert"), URIRef(EX + "wrote"), URIRef(EX + "Dune"))
+    assert not rules.is_link(URIRef(EX + "Dune"), RDF.type, URIRef(EX + "Book"))   # rdf:type is an attribute
+    typed = graph.Rules.of(ds.merged, type_links=True)
+    assert typed.is_link(URIRef(EX + "Dune"), RDF.type, URIRef(EX + "Book"))
+    hidden = graph.Rules.of(ds.merged, attribute_preds=[URIRef(EX + "wrote")])
+    assert URIRef(EX + "wrote") in hidden.attribute and not hidden.is_link(
+        URIRef(EX + "Herbert"), URIRef(EX + "wrote"), URIRef(EX + "Dune"))
