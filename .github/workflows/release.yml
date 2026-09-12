@@ -1,9 +1,12 @@
 name: release
 
 # A merge to main that changes ttl3d/__init__.py's version tags it (vX.Y.Z), publishes the GitHub
-# release with that version's CHANGELOG section as notes, and calls publish.yml, which puts the
-# package on PyPI and attaches the files. Zenodo archives the release through its webhook. A
-# version that is already tagged is left alone, so a merge without a bump is a no-op.
+# release with that version's CHANGELOG section as notes, and dispatches publish.yml, which puts
+# the package on PyPI and attaches the files. Dispatch, not a reusable-workflow call: PyPI's
+# trusted publishing checks the top-level workflow's name against the registered publisher
+# (publish.yml), so a reusable call is refused; and workflow_dispatch is the one event the
+# workflow token may raise that still creates a run. Zenodo archives the release through its
+# webhook. A version that is already tagged is left alone, so a merge without a bump is a no-op.
 on:
   push:
     branches: [main]
@@ -12,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  actions: write        # to dispatch publish.yml
 
 jobs:
   tag:
@@ -47,13 +51,20 @@ jobs:
           git tag -a "$TAG" -m "ttl3d ${TAG#v}"
           git push origin "$TAG"
           gh release create "$TAG" --title "ttl3d ${TAG#v}" --notes-file notes.md --verify-tag
-
-  publish:
-    needs: tag
-    if: needs.tag.outputs.new == 'true'
-    uses: ./.github/workflows/publish.yml
-    with:
-      tag: ${{ needs.tag.outputs.tag }}
-    permissions:
-      id-token: write
-      contents: write
+      - if: steps.version.outputs.new == 'true'
+        name: dispatch publish.yml for the tag and wait for it
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run publish.yml --ref main -f tag="$TAG"
+          run=""
+          for i in $(seq 1 12); do
+            sleep 10
+            run=$(gh run list --workflow publish.yml --event workflow_dispatch --created ">=$before" --limit 1 --json databaseId --jq '.[0].databaseId')
+            [ -n "$run" ] && break
+          done
+          test -n "$run" || { echo "publish.yml did not start"; exit 1; }
+          echo "publish run $run"
+          gh run watch "$run" --exit-status --interval 15
