@@ -212,15 +212,16 @@ def test_plain_files_and_graph_sources_carry_no_named_graphs(library):
 
 def test_a_plain_file_keeps_the_parsed_default_graph_instead_of_copying_it(library):
     ds = load.load_files([library])
-    # type(...) is Graph holds for a context graph too on this rdflib version, so it can't
-    # tell a copy from the original; the no-copy property is what the final review measured.
     assert len(ds.graphs["library"]) == len(ds.merged) > 0
+    # the parsed store's own default graph, not a copy
+    assert ds.graphs["library"].identifier == load.DATASET_DEFAULT_GRAPH_ID
 
 
 def test_blank_node_graphs_are_folded_into_a_fresh_default_graph(tiny_nq):
     ds = load.load_files([tiny_nq])
     assert len(ds.graphs["tiny"]) == 2                    # default triple + the blank-node graph's triple
-    assert type(ds.graphs["tiny"]) is Graph               # a fresh Graph, since folding had to copy
+    # a fresh Graph: folding had to copy
+    assert ds.graphs["tiny"].identifier != load.DATASET_DEFAULT_GRAPH_ID
 
 
 def test_the_same_graph_iri_in_two_files_is_one_key_holding_the_union(tmp_path):
