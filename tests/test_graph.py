@@ -1,4 +1,7 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -285,3 +288,42 @@ def test_a_bound_prefix_shortens_urn_namespaces_for_groups_and_labels(tmp_path):
     assert data["groups"] == ["g"] and {n["ns"] for n in data["nodes"]} == {"g"}
     assert sorted(n["label"] for n in data["nodes"]) == ["a", "b"]           # local names, not the whole URN
     assert data["links"][0]["predicates"] == ["p"]
+
+
+def test_a_named_graph_owns_its_nodes_and_edges_like_a_file(library_trig):
+    data = build(library_trig)
+    assert data["groups"] == [":catalogue", "ex:extra", "library"]
+    assert node(data, "Book")["file"] == "library"                 # declared in the default graph
+    assert node(data, "Dune")["file"] == ":catalogue"              # the repeated label in ex:extra does not steal it
+    assert node(data, "Asimov")["file"] == "ex:extra"
+    link = next(l for l in data["links"] if l["predicates"] == ["relatedTo"])
+    assert link["files"] == ["ex:extra"] and link["group"] == "ex:extra"
+    assert len(data["nodes"]) == 12 and len(data["links"]) == 6    # the same picture as the two Turtle files
+
+
+def test_type_and_namespace_colouring_ignore_the_graph_split(library, library_extra, library_trig):
+    for color_by in ("type", "namespace"):
+        assert build(library_trig, color_by=color_by)["groups"] == build(library, library_extra,
+                                                                          color_by=color_by)["groups"]
+
+
+def test_an_nquads_graph_without_a_prefix_is_grouped_under_its_full_iri(tiny_nq):
+    data = build(tiny_nq)
+    assert data["groups"] == ["http://example.org/nt#G", "tiny"]
+    assert {n["file"] for n in data["nodes"]} == {"tiny", "http://example.org/nt#G"}
+
+
+def test_a_source_with_several_identifier_urls_shows_the_smallest_whatever_the_hash_seed(tmp_path):
+    ttl = tmp_path / "ids.ttl"
+    ttl.write_text(
+        "@prefix ex: <http://example.org/i#> .\n@prefix dcterms: <http://purl.org/dc/terms/> .\n"
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "ex:src dcterms:identifier <http://b.example/two>, <http://a.example/one> ; rdfs:label \"src\" .\n"
+        "ex:n dcterms:source ex:src ; ex:p ex:m .\n", encoding="utf-8")
+    code = ("import sys\nfrom ttl3d import graph, load\n"
+            "data = graph.build(load.load_files([sys.argv[1]]))\n"
+            "print(next(n for n in data['nodes'] if n['id'].endswith('#n'))['sources'][0]['url'])\n")
+    urls = {subprocess.run([sys.executable, "-c", code, str(ttl)], capture_output=True, text=True, cwd=REPO,
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed}).stdout.strip()
+            for seed in ("1", "2", "3")}
+    assert urls == {"http://a.example/one"}

@@ -130,8 +130,10 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
     labels = {}
     for s in node_ids:
         labels[s] = _first(g, s, LABEL_PREDS, lang) or local(s, prefixes)
-    src_url = {s: str(o) for s, _, o in g.triples((None, DCTERMS.identifier, None))
-               if str(o).startswith("http")}
+    src_url: dict = {}                    # the smallest URL wins, whatever order rdflib yields them in
+    for s, _, o in g.triples((None, DCTERMS.identifier, None)):
+        if str(o).startswith("http") and (s not in src_url or str(o) < src_url[s]):
+            src_url[s] = str(o)
 
     def group_of(n, types) -> str:
         if color_by == "file":
