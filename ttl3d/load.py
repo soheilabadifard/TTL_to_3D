@@ -57,8 +57,6 @@ def _parse(f: Path, fmt: str | None = None) -> Graph:
 
 # one source; a tuple is always a (name, item) pair, never two sources
 Source = str | os.PathLike | Graph | tuple[str, str | os.PathLike | Graph]
-# what load() and the API accept: one source, several, or a mapping of name to source
-Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph]
 
 _NOT_A_SOURCE = (
     "a source is a path, an rdflib.Graph, a (name, source) pair or a "
@@ -88,7 +86,11 @@ def _named(item) -> tuple:
     return None, item
 
 
-def load(sources, fmt: str | None = None) -> Dataset:
+# what load() and the API accept: one source, several, or a mapping of name to source
+Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph]
+
+
+def load(sources: Sources, fmt: str | None = None) -> Dataset:
     """Parse and merge paths and in-memory graphs, keeping which source said what.
 
     A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph"; a
@@ -119,5 +121,6 @@ def load(sources, fmt: str | None = None) -> Dataset:
 
 
 def load_files(paths: Iterable[str | Path], fmt: str | None = None) -> Dataset:
-    """Paths only; the original entry point, kept as an alias of `load`."""
+    """Paths only; the original entry point, kept as an alias of `load`. `list()` first so a
+    tuple of paths stays several sources, not one `(name, path)` pair."""
     return load(list(paths), fmt)

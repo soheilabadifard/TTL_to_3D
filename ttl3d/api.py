@@ -53,6 +53,8 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
         raise ValueError(f"layout must be one of {_layout.LAYOUT_MODES}, got {layout!r}")
     if labels not in _layout.LABEL_MODES:
         raise ValueError(f"labels must be one of {_layout.LABEL_MODES}, got {labels!r}")
+    if color_by not in graph.COLOR_KEYS:
+        raise ValueError(f"color_by must be one of {graph.COLOR_KEYS}, got {color_by!r}")
     ds = load.load(sources, fmt)
     if not ds.stems:
         raise ValueError("at least one source is needed")
@@ -83,6 +85,8 @@ def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file
             attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None) -> str:
     """The page as HTML text. `sources`: a path, an rdflib.Graph, a (name, path-or-Graph) pair,
     or a list of those; a path is named by its stem, a Graph by its pair name or "graph".
+    `title=None` means the first source's name; an empty string is an empty title (unlike
+    `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")
     or rdflib terms. Raises LoadError / FileNotFoundError / ValueError / TypeError."""
     return build_page(sources, title=title, color_by=color_by, layout=layout, labels=labels, view=view,
@@ -111,7 +115,7 @@ class Page:
         return (f'<iframe srcdoc="{_html.escape(self.html, quote=True)}" sandbox="allow-scripts" '
                 f'style="width:100%;height:{int(self.height)}px;border:0" title="ttl3d"></iframe>')
 
-    def write(self, out) -> Path:
+    def write(self, out: str | os.PathLike) -> Path:
         """Write the page (UTF-8, LF newlines, parents created) and return the path."""
         return _render.write_html(self.html, out)
 

@@ -3,7 +3,7 @@ import json
 import re
 
 import pytest
-from rdflib import Graph, Namespace, URIRef
+from rdflib import RDF, RDFS, Graph, Literal, Namespace, URIRef
 
 import ttl3d
 from ttl3d import api, cli, layout
@@ -39,8 +39,7 @@ def test_options_reach_the_page(library, library_extra):
     assert _page_data(html)["color_by"] == "type"
 
 
-def test_lang_picks_the_label_and_type_links_draw_rdf_type(library):
-    from rdflib import RDF, RDFS, Literal
+def test_lang_picks_the_label_and_type_links_draw_rdf_type():
     g = Graph()
     g.add((EX.apple, RDFS.label, Literal("apple", lang="en")))
     g.add((EX.apple, RDFS.label, Literal("Apfel", lang="de")))
@@ -66,6 +65,8 @@ def test_bad_options_and_sources_raise(library, tmp_path):
         ttl3d.to_html(library, layout="random")
     with pytest.raises(ValueError, match="labels"):
         ttl3d.to_html(library, labels="sometimes")
+    with pytest.raises(ValueError, match="color_by"):
+        ttl3d.to_html(tmp_path / "missing.ttl", color_by="colour")      # checked before any file is read
     with pytest.raises(ValueError, match="prefix"):
         ttl3d.to_html(library, attribute_preds=["nope:thing"])
     with pytest.raises(FileNotFoundError):
