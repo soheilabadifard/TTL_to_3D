@@ -60,7 +60,10 @@ Source = str | os.PathLike | Graph | tuple[str, str | os.PathLike | Graph]
 # what load() and the API accept: one source, several, or a mapping of name to source
 Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph]
 
-_NOT_A_SOURCE = "a source is a path, an rdflib.Graph, a (name, source) pair or a mapping of names to those, not {}"
+_NOT_A_SOURCE = (
+    "a source is a path, an rdflib.Graph, a (name, source) pair or a "
+    "mapping of names to those, not {}"
+)
 
 
 def _items(sources) -> list:
