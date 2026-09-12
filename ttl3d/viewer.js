@@ -127,7 +127,7 @@ function showNode(n) {
   h += `<div class="cls">${esc(n.types.join(', ') || 'untyped')} · ${esc(n.group)}</div>`;
   h += `<div class="iri">${esc(n.id)}</div>`;
   if (n.definition) h += `<p class="def">${esc(n.definition)}</p>`;
-  const iri = (DATA.graphs || {})[n.file];        // the IRI behind a named-graph key, if the owner is one
+  const iri = DATA.graphs[n.file];                // the IRI behind a named-graph key, if the owner is one
   h += `<table><tr><td>source</td><td>${esc(n.file)}` +
        (iri ? `<div class="iri">${esc(iri)}</div>` : '') + `</td></tr>` +
        `<tr><td>namespace</td><td>${esc(n.ns)}</td></tr></table>`;
@@ -178,16 +178,17 @@ document.getElementById('close').addEventListener('click', closeDetail);
 // --- one shared filter: legend group selection AND label search -------------
 const activeGroups = new Set();
 let query = '';
+// in file mode a selected row is a source, and it keeps every edge that source asserts, not only the
+// edges it asserted first; in the other modes rows are types or namespaces and say nothing about edges
+const assertedBy = l => CONFIG.colorBy === 'file' && l.files.some(f => activeGroups.has(f));
 
 function applyFilter() {
   const core = new Set();       // ids of nodes in the selected groups
-  const edgeKeep = new Set();   // endpoints of edges the selected groups assert
+  const edgeKeep = new Set();   // endpoints of edges the selected sources assert
   if (activeGroups.size) {
     DATA.nodes.forEach(n => { if (activeGroups.has(n.group)) core.add(n.id); });
-    DATA.links.forEach(l => {                       // every source that asserts the edge, not only the first
-      if (l.files.some(f => activeGroups.has(f))) {
-        edgeKeep.add(idOf(l.source)); edgeKeep.add(idOf(l.target));
-      }
+    DATA.links.forEach(l => {
+      if (assertedBy(l)) { edgeKeep.add(idOf(l.source)); edgeKeep.add(idOf(l.target)); }
     });
   }
   const isKept = n => {
@@ -201,7 +202,7 @@ function applyFilter() {
     n._dim = !(isKept(n) && qOk);
   });
   DATA.links.forEach(l => {
-    const grpLink = l.files.some(f => activeGroups.has(f));
+    const grpLink = assertedBy(l);
     const touchesCore = !activeGroups.size ||
       core.has(idOf(l.source)) || core.has(idOf(l.target));
     l._dim = (l.source._dim && l.target._dim) || !(touchesCore || grpLink);

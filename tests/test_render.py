@@ -260,7 +260,7 @@ def test_named_graph_iris_reach_the_page_and_title_their_legend_rows(library_tri
 
 def test_the_card_shows_the_graph_iri_under_the_source_key():
     js = render.viewer_source()
-    assert "(DATA.graphs || {})[n.file]" in js
+    assert "DATA.graphs[n.file]" in js
     assert '<div class="iri">${esc(iri)}</div>' in js
 
 
@@ -280,11 +280,36 @@ def test_an_annotation_only_source_gets_a_muted_legend_row_that_explains_itself(
     data = graph.build(load.load_files([library, notes]))
     page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
     assert ('class="row grp annot" data-group="notes" '
-            'title="declares no node and asserts no edge; its labels are on the cards"') in page
+            'title="declares no node and asserts no edge; what it adds shows on the cards"') in page
     assert 'class="row grp" data-group="library"><span' in page
 
 
 def test_the_filter_keeps_the_edges_every_selected_source_asserts():
     js = render.viewer_source()
-    assert js.count("l.files.some(f => activeGroups.has(f))") == 2      # edgeKeep and grpLink
+    assert "const assertedBy = l => CONFIG.colorBy === 'file' && l.files.some(f => activeGroups.has(f))" in js
+    assert js.count("assertedBy(l)") == 2                               # edgeKeep and grpLink
     assert "activeGroups.has(l.group)" not in js
+
+
+def test_annotation_only_sources_take_no_palette_slot_and_never_fall_into_other():
+    groups = [f"g{i:02d}" for i in range(12)] + ["notes"]     # twelve real sources plus one annotator
+    counts = {g: 12 - i for i, g in enumerate(groups[:12])}
+    top, rest = render.rank_groups(groups, counts)
+    assert top == set(groups[:12]) and rest == []                     # the twelve keep their colours
+    colors = render.assign_colors(groups, counts)
+    assert "notes" not in colors                                      # nothing of its own to colour
+    data = {"nodes": [{"id": g, "label": g, "group": g, "file": g} for g in groups[:12]],
+            "links": [], "groups": sorted(groups), "color_by": "file", "graphs": {}}
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert 'class="row grp annot" data-group="notes"' in page and "other (" not in page
+
+
+def test_a_named_graph_that_only_annotates_gets_both_hints_in_its_title(tmp_path, library):
+    trig = tmp_path / "notes.trig"
+    trig.write_text("@prefix ex: <http://example.org/library#> .\n"
+                    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                    'ex:notes { ex:Dune rdfs:comment "Annotated elsewhere." . }\n', encoding="utf-8")
+    data = graph.build(load.load_files([library, trig]))
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert ('class="row grp annot" data-group="ex:notes" title="http://example.org/library#notes. '
+            'declares no node and asserts no edge; what it adds shows on the cards"') in page

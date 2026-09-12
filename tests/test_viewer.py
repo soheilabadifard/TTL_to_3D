@@ -2,6 +2,7 @@
 (`pip install -e .[browser] && playwright install chromium`). TTL3D_BROWSER=firefox or webkit
 runs the same tests on another engine (`playwright install firefox webkit`)."""
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -421,6 +422,29 @@ def test_selecting_a_re_asserting_source_keeps_its_edge_and_an_annotation_only_s
             assert page.evaluate("DATA.nodes.filter(n => !n._dim).length") == 0   # nothing drawable
             assert page.evaluate("document.querySelector('.row.grp[data-group=\"notes\"]')"
                                  ".classList.contains('annot')")
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_type_mode_selection_ignores_a_source_whose_name_matches_a_type(tmp_path):
+    # a file named like a class: in type mode the "Book" row selects the Book-typed nodes and their
+    # neighbours, never every edge the file Book.ttl asserts (the Person class is neither)
+    shutil.copy(REPO / "tests" / "fixtures" / "library.ttl", tmp_path / "Book.ttl")
+    out = tmp_path / "book.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(tmp_path / "Book.ttl"), "--color-by", "type",
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            page.click(".row.grp[data-group='Book']")
+            assert page.evaluate("DATA.nodes.find(n => n.label === 'Person')._dim") is True
+            assert page.evaluate("DATA.nodes.find(n => n.label === 'Dune')._dim") is False
         finally:
             browser.close()
     assert errors == []

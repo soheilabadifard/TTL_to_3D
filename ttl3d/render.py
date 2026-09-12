@@ -30,21 +30,29 @@ UNKNOWN_COLOR = "#9ca3af"
 OTHER_COLOR = "#94a3b8"
 MAX_COLORED_GROUPS = 11   # past len(PALETTE) groups, only the largest keep a colour
 VIEWS = ("3d", "2d")      # the starting view; the page switches between them
-ANNOTATION_ONLY = "declares no node and asserts no edge; its labels are on the cards"
+ANNOTATION_ONLY = "declares no node and asserts no edge; what it adds shows on the cards"
 
 
 def group_counts(data: dict) -> dict:
-    """Nodes per group; in file mode every source also counts the links it asserts."""
+    """Nodes per group; in file mode every source also counts the links it asserts (all of them, not
+    only the ones it asserted first). A source absent from the result owns nothing drawable."""
     counts = Counter(n["group"] for n in data["nodes"])
     if data.get("color_by") == "file":
         counts.update(f for l in data["links"] for f in l["files"])
     return dict(counts)
 
 
+def annotation_only(group, counts) -> bool:
+    """A legend group with nothing drawable of its own: it neither owns a node nor asserts a link.
+    Without counts nothing can be told apart, so every group is taken as real."""
+    return group != "?" and bool(counts) and not counts.get(group)
+
+
 def rank_groups(groups, counts=None) -> tuple[set, list]:
-    """(groups that get their own colour, groups bucketed as "other")."""
+    """(groups that get their own colour, groups bucketed as "other"). Annotation-only groups take no
+    colour and never join the bucket: their row is drawn muted instead."""
     counts = counts or {}
-    named = [g for g in groups if g != "?"]
+    named = [g for g in groups if g != "?" and not annotation_only(g, counts)]
     if len(named) <= len(PALETTE):
         return set(named), []
     ranked = sorted(named, key=lambda g: (-counts.get(g, 0), g))
@@ -60,21 +68,22 @@ def assign_colors(groups, counts=None) -> dict:
 
 
 def _legend(groups, colors, counts, graphs=None) -> str:
-    """One clickable row per coloured group. A named-graph key carries its IRI as the hover title; a
-    source that owns no node and asserts no link (count 0) is muted and its title says why."""
+    """One clickable row per coloured group. A named-graph key carries its IRI as the hover title; an
+    annotation-only source (no node, no link of its own) is muted, keeps its row outside the colour
+    ranking, and its title says why."""
     esc = lambda s: _html.escape(str(s), quote=True)
     graphs = graphs or {}
     top, rest = rank_groups(groups, counts)
 
     def row(g):
-        annot = g != "?" and not counts.get(g)
-        hints = ([esc(graphs[g])] if g in graphs else []) + ([ANNOTATION_ONLY] if annot else [])
-        title = f' title="{". ".join(hints)}"' if hints else ""
+        annot = annotation_only(g, counts)
+        hints = ([graphs[g]] if g in graphs else []) + ([ANNOTATION_ONLY] if annot else [])
+        title = f' title="{esc(". ".join(hints))}"' if hints else ""
         cls = "row grp annot" if annot else "row grp"
         return (f'<div class="{cls}" data-group="{esc(g)}"{title}><span class="dot" '
                 f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>')
 
-    rows = [row(g) for g in groups if g in top or g == "?"]
+    rows = [row(g) for g in groups if g in top or g == "?" or annotation_only(g, counts)]
     if rest:
         rows.append(f'<div class="row grp" data-groups="{esc(json.dumps(rest))}"><span class="dot" '
                     f'style="background:{OTHER_COLOR}"></span>other ({len(rest)} groups)</div>')
@@ -124,7 +133,7 @@ def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str
     esc = lambda s: _html.escape(str(s), quote=True)
     counts = group_counts(data)
     colors = assign_colors(data["groups"], counts)
-    legend = _legend(data["groups"], colors, counts, data.get("graphs"))
+    legend = _legend(data["groups"], colors, counts, data["graphs"])
     config = {"title": title, "colorBy": data.get("color_by", "file"),
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
                                                  "edge": bool(labels["edge"])},

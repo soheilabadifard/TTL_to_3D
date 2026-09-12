@@ -48,7 +48,14 @@ ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl -o solar.html
 Open `solar.html` in any browser. Pass several files and they merge into one
 graph; the default colouring then shows which file declared each node and
 which file asserted each edge. A TriG or N-Quads file works the same way: each of its named
-graphs is treated as a file of its own.
+graphs is treated as a file of its own:
+
+```bash
+ttl3d examples/solar-system.trig -o solar-graphs.html
+```
+
+The same Solar System as one TriG dataset: the schema in the default graph, the bodies and the
+missions in two named graphs, one legend row each.
 
 Without installing, run the module from a clone: `python -m ttl3d ...`.
 

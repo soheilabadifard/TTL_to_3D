@@ -27,6 +27,9 @@ def test_the_trig_demo_draws_the_same_picture_as_the_two_files():
                        for l in d["links"]}
     assert edges(trig) == edges(turtle)                            # 48 links, 12 two-way, as test_graph pins
     assert trig["groups"] == [":bodies", ":missions", "solar-system"]
+    owner = {n["label"]: n["file"] for n in trig["nodes"]}
+    assert owner["planet"] == "solar-system" and owner["Earth"] == ":bodies"
+    assert owner["Voyager 2"] == ":missions"
 
 
 def test_the_demo_site_and_the_identical_pages_job_build_the_trig_page():
