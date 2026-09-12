@@ -6,9 +6,9 @@
 
 Options mirror the command line. Errors are raised, never printed.
 
-    sources --> load.load --> Dataset --> graph.build --> data --> layout --> render.render_html --> html
-    (paths, Graphs, Datasets,                                    (stress: positions + notice,
-     (name, item), {name: item})                                  force: nothing)
+    sources --> load.load --> Dataset --> [slice.select] --> graph.build --> data --> layout --> html
+    (paths, Graphs, Datasets,                                                    (stress: positions + notice,
+     (name, item), {name: item})                                                 force: nothing)
                                      build_page <-- cli.main -- notice -> stderr, summary line, exit code
                                          |
                                          +-- to_html(...) -> str     +-- write(..., out) -> Path
@@ -28,6 +28,7 @@ from rdflib.term import URIRef
 from . import graph, load
 from . import layout as _layout
 from . import render as _render
+from . import slice as _slice
 from .load import Sources
 
 
@@ -41,12 +42,30 @@ class Built:
     labels: dict
 
 
+def check_hops(hops) -> None:
+    """The one place the hop count is validated: a non-negative int, not a bool. The CLI calls it
+    before it reads standard input; build_page calls it before it reads any file."""
+    if isinstance(hops, bool) or not isinstance(hops, int) or hops < 0:
+        raise ValueError(f"hops must be a non-negative integer, got {hops!r}")
+
+
+def _terms(terms: Iterable[str | URIRef], ds) -> set:
+    """URIRefs as they are (URIRef is a str subclass); plain strings resolve like the CLI's."""
+    terms = list(terms)
+    return {t for t in terms if isinstance(t, URIRef)} | graph.resolve_terms(
+        [t for t in terms if not isinstance(t, URIRef)], ds)
+
+
 def build_page(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
                labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
                attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
+               focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
                notice: Callable[[str], None] | None = None) -> Built:
     """Run every stage once. `notice` receives the stress-layout announcement, if any (the CLI
-    prints it to stderr; the API stays silent). Option values are checked before any work."""
+    prints it to stderr; the API stays silent). Option values are checked before any work.
+    `focus`, `hops` and `schema` cut the data down before the model is built (see ttl3d.slice);
+    `hops` is checked before any file is read, a focus that is not a node in the data raises
+    after loading."""
     if view not in _render.VIEWS:
         raise ValueError(f"view must be one of {_render.VIEWS}, got {view!r}")
     if layout not in _layout.LAYOUT_MODES:
@@ -55,14 +74,21 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
         raise ValueError(f"labels must be one of {_layout.LABEL_MODES}, got {labels!r}")
     if color_by not in graph.COLOR_KEYS:
         raise ValueError(f"color_by must be one of {graph.COLOR_KEYS}, got {color_by!r}")
+    check_hops(hops)
     ds = load.load(sources, fmt)
     if not ds.sources:
         raise ValueError("at least one source is needed")
-    preds = list(attribute_preds)
-    # URIRef is a str subclass: keep terms as they are, resolve the plain strings like the CLI
-    extra = {t for t in preds if isinstance(t, URIRef)}
-    extra |= graph.resolve_terms([t for t in preds if not isinstance(t, URIRef)], ds)
+    extra = _terms(attribute_preds, ds)
+    # focus terms keep their order for the notice; each resolves like an attribute predicate
+    seeds = [t if isinstance(t, URIRef) else graph.resolve_terms([t], ds).pop() for t in (focus or ())]
+    cut = None
+    if seeds or schema:
+        cut = _slice.select(ds, focus=seeds, hops=hops, schema=schema, type_links=type_links,
+                            attribute_preds=extra)
+        ds = cut.dataset
     data = graph.build(ds, color_by=color_by, lang=lang, type_links=type_links, attribute_preds=extra)
+    if cut and notice:
+        notice(_slice.describe(len(data["nodes"]), cut.total, seeds, hops, schema, ds.prefixes))
     mode = _layout.choose_layout(len(data["nodes"]), layout)
     if mode == "stress":
         message = _layout.stress_notice(len(data["nodes"]))
@@ -82,16 +108,20 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
 
 def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
             labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
-            attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None) -> str:
+            attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
+            focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False) -> str:
     """The page as HTML text. `sources`: a path, an rdflib.Graph or rdflib.Dataset, a (name, item)
     pair, or a list of those; a path is named by its stem, a Graph by its pair name or "graph", a
     Dataset by its pair name or "dataset". A quad file or a Dataset adds one source per named graph.
     `title=None` means the first source's name; an empty string is an empty title (unlike
     `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")
-    or rdflib terms. Raises LoadError / FileNotFoundError / ValueError / TypeError."""
+    or rdflib terms. `focus`, `hops` and `schema` slice the data first (a neighbourhood, the
+    schema, or the neighbourhood inside the schema). Raises LoadError / FileNotFoundError /
+    ValueError / TypeError."""
     return build_page(sources, title=title, color_by=color_by, layout=layout, labels=labels, view=view,
-                      lang=lang, type_links=type_links, attribute_preds=attribute_preds, fmt=fmt).html
+                      lang=lang, type_links=type_links, attribute_preds=attribute_preds, fmt=fmt,
+                      focus=focus, hops=hops, schema=schema).html
 
 
 def write(sources: Sources, out: str | os.PathLike, **options: Any) -> Path:
