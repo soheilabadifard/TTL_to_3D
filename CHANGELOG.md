@@ -2,7 +2,20 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.3.0 (2026-09-12)
+
 Releases are archived on Zenodo; `CITATION.cff` and the README carry the DOI.
+A merge to `main` that changes the version now tags it, publishes the GitHub
+release from the changelog section and pushes the package to PyPI on its own;
+the notebook and the README install `ttl3d>=0.3.0`, so an older PyPI fails
+clearly instead of at first use.
+
+A Python entry point: `ttl3d.to_html`, `ttl3d.write` and `ttl3d.show` take file paths and
+in-memory rdflib graphs, named through pairs or a mapping, with the command line's options;
+`show` displays the page inline in notebooks. The command line runs on the same code path.
+An example notebook with an Open-in-Colab badge.
 
 ## 0.2.3 (2026-09-11)
 
