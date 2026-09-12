@@ -13,7 +13,8 @@ from pathlib import Path
 
 def section(changelog: str, version: str) -> str | None:
     """The body under `## <version> (<date>)`, up to the next `## ` heading; None when absent."""
-    m = re.search(rf"^## {re.escape(version)} \([^)]*\)\n(.*?)(?=^## |\Z)", changelog, re.DOTALL | re.MULTILINE)
+    pattern = rf"^## {re.escape(version)} \([^)]*\)\n(.*?)(?=^## |\Z)"
+    m = re.search(pattern, changelog, re.DOTALL | re.MULTILINE)
     return m.group(1).strip() + "\n" if m else None
 
 
