@@ -65,12 +65,15 @@ def _unique_key(stem: str, taken: dict) -> str:
 def split_iri(iri, prefixes: Mapping[str, str] | None = None) -> tuple[str, str]:
     """(namespace, local name) of an IRI. Cut at the last '#' or '/' when that namespace is bound,
     or when nothing else matches; otherwise at the longest bound namespace the IRI starts with and
-    extends, so `urn:graphs:planets` with `ex: <urn:graphs:>` splits as ('urn:graphs:', 'planets').
-    Legend keys, node namespaces and local names all go through here, so they always agree."""
+    extends whose remainder holds no '/' or '#', so `urn:graphs:planets` with `ex: <urn:graphs:>`
+    splits as ('urn:graphs:', 'planets') while `http://example.org/data/x` under a bound
+    `<http://example.org/>` keeps the cut ('http://example.org/data/', 'x'). Legend keys, node
+    namespaces and local names all go through here, so they always agree."""
     s = str(iri)
     ns = s[:max(s.rfind("#"), s.rfind("/")) + 1]
     if prefixes and ns not in prefixes:
-        bound = [b for b in prefixes if len(b) < len(s) and s.startswith(b)]
+        bound = [b for b in prefixes
+                 if len(b) < len(s) and s.startswith(b) and "/" not in s[len(b):] and "#" not in s[len(b):]]
         if bound:
             ns = max(bound, key=len)
     return ns, s[len(ns):]

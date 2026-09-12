@@ -116,9 +116,10 @@ file's name. The same graph IRI in several files is one source.
 - An edge asserted in both directions (`:Luna :orbits :Earth` and `:Earth :hasMoon :Luna`) is one link labelled `orbits ⇄ hasMoon`, without an arrowhead.
 - Labels follow `--lang`: the requested language first, then untagged literals, then anything else; every other label value becomes a synonym on the card, and a `rdfs:comment` that loses to a `skos:definition` still appears in the property table.
 - Namespaces follow the prefixes the inputs bind: an IRI is cut at its last `/` or `#`
-  when that namespace is bound, otherwise at the longest bound namespace it extends (so
-  `urn:` vocabularies shorten too), otherwise at the last `/` or `#`. Legend keys, the
-  namespace column and local names all use this one rule.
+  when that namespace is bound, otherwise at the longest bound namespace it extends
+  without a further `/` or `#` (so `urn:` vocabularies shorten too), otherwise at the
+  last `/` or `#`. Legend keys, the namespace column and local names all use this one
+  rule.
 
 ## In the page
 

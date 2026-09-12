@@ -161,6 +161,13 @@ def test_a_bound_cut_namespace_wins_over_a_shorter_bound_one():
     assert load.namespace_of("http://example.org/lib#Book", p) == "http://example.org/lib#"
 
 
+def test_a_hierarchical_iri_under_a_bound_base_keeps_its_slash_cut():
+    p = {"http://example.org/": "ex"}
+    assert load.split_iri("http://example.org/data/x", p) == ("http://example.org/data/", "x")
+    assert load.local("http://example.org/data/x", p) == "x"                # not "data/x"
+    assert load.split_iri("http://example.org/x", p) == ("http://example.org/", "x")   # rule 1: bound cut
+
+
 def test_local_and_namespace_of_keep_their_old_results_without_prefixes():
     assert load.local("http://e/a#b") == "b" and load.namespace_of("http://e/a#b") == "http://e/a#"
     assert load.local("http://e/a/") == "http://e/a/"  # empty local part is the IRI itself
