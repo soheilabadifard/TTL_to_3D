@@ -1,5 +1,6 @@
 """ttl3d.load: parse one or more RDF files, keeping which file said what."""
 import pytest
+from rdflib import Graph, Namespace
 
 from ttl3d import load
 
@@ -64,3 +65,66 @@ def test_explicit_format_wins_over_the_extension(tmp_path, library):
     with pytest.raises(load.LoadError) as e:
         load.load_files([weird], fmt="xml")
     assert "as xml" in str(e.value)
+
+
+EX = Namespace("http://example.org/mem#")
+
+
+def _mem_graph():
+    g = Graph()
+    g.bind("mem", EX)
+    g.add((EX.a, EX.p, EX.b))
+    return g
+
+
+def test_a_graph_in_memory_is_a_source_named_graph():
+    ds = load.load(_mem_graph())
+    assert ds.stems == ["graph"] and len(ds.merged) == 1 and ds.files == []
+
+
+def test_a_named_pair_names_a_graph_or_a_path(library):
+    ds = load.load([("planets", _mem_graph()), ("books", library)])
+    assert ds.stems == ["planets", "books"]
+    assert ds.files == [library]                       # only real paths are listed
+
+
+def test_paths_and_graphs_mix_and_duplicate_names_get_suffixes(library):
+    g = _mem_graph()
+    ds = load.load([library, ("library", g), g, g])
+    assert ds.stems == ["library", "library~2", "graph", "graph~2"]
+
+
+def test_a_graph_source_is_used_as_is_and_its_prefixes_are_collected():
+    g = _mem_graph()
+    ds = load.load(("mem", g))                         # a top-level tuple is one named source
+    assert ds.graphs["mem"] is g
+    assert ds.prefixes[str(EX)] == "mem"
+
+
+def test_a_single_path_needs_no_list(library):
+    assert load.load(str(library)).stems == ["library"]
+
+
+def test_a_source_of_another_type_raises_type_error_naming_the_type():
+    with pytest.raises(TypeError, match="rdflib.Graph.*not int"):
+        load.load([42])
+    with pytest.raises(TypeError, match="rdflib.Graph.*not int"):
+        load.load(42)                                      # at the top level too, not "int is not iterable"
+    with pytest.raises(TypeError, match="pair"):
+        load.load(("a", "b", "c"))
+
+
+def test_load_files_is_load(library):
+    assert load.load_files([library]).stems == load.load([library]).stems == ["library"]
+
+
+def test_a_mapping_names_its_sources_in_order(library):
+    ds = load.load({"planets": _mem_graph(), "books": library})
+    assert ds.stems == ["planets", "books"]
+
+
+def test_a_pair_or_mapping_key_that_is_not_a_str_raises_type_error():
+    with pytest.raises(TypeError, match="pair"):
+        load.load((1, _mem_graph()))
+    with pytest.raises(TypeError, match="pair"):
+        load.load({1: _mem_graph()})
