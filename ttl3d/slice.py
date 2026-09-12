@@ -8,7 +8,8 @@ model code.
         |  schema=True : within = U restricted to class and property terms          (schema_terms)
         |  focus given : kept = breadth-first over link triples, both directions, `hops` steps,
         |                never leaving `within`; seeds are always kept              (neighbourhood)
-        |  type_links  : plus every kept node's classes inside `within`             (type closure)
+        |  type_links  : plus every kept node's classes inside `within`, to a fixed point, so a
+        |                class the closure itself adds gets its own classes closed too   (type closure)
         |  neither     : build_page does not call select at all
         v
     kept --copy--> for each source graph, the kept subjects' triples through the subject index; a
@@ -122,8 +123,11 @@ def select(ds: Dataset, *, focus: Iterable[URIRef] = (), hops: int = 1, schema: 
         raise ValueError("; ".join(f"focus <{m}> is not a node in the data" for m in missing))
     within = schema_terms(g, rules, nodes) if schema else nodes
     kept = neighbourhood(g, rules, seeds, hops, within) if seeds else within
-    if type_links:      # a kept node's classes come along, so cards and colours keep their types
-        kept |= {o for s in list(kept) for o in g.objects(s, RDF.type) if o in within}
+    if type_links:                                   # A9: a kept node keeps its classes, and so do they
+        fresh = set(kept)
+        while fresh:
+            fresh = {o for s in fresh for o in g.objects(s, RDF.type) if o in within} - kept
+            kept |= fresh
     graphs: dict[str, Graph] = {}
     named: dict[str, URIRef] = {}
     for key, source in ds.graphs.items():

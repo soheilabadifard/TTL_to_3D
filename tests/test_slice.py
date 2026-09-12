@@ -51,6 +51,19 @@ def test_one_hop_follows_links_both_ways_but_never_an_attribute(two):
     assert names(sliced(two, focus=[ex("Dune")], hops=2)) == ["Dune", "Herbert", "Prefonly"]
 
 
+def test_an_attribute_predicate_is_not_a_hop_but_its_triple_survives_on_the_card(tmp_path):
+    ttl = tmp_path / "c.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/c#> .\nex:a ex:custom ex:b ; ex:p ex:c .\n",
+                   encoding="utf-8")
+    def ex_c(s):
+        return URIRef("http://example.org/c#" + s)
+
+    cut = slice.select(load.load_files([ttl]), focus=[ex_c("a")], hops=1, attribute_preds=[ex_c("custom")])
+    data = graph.build(cut.dataset, attribute_preds=[ex_c("custom")])
+    assert names(data) == ["a", "c"] and edges(data) == [("a", "p", "c")]
+    assert (ex_c("a"), ex_c("custom"), ex_c("b")) in cut.dataset.merged       # kept for the card, not walked
+
+
 def test_type_links_make_classes_hops_and_a_class_is_a_hub(two):
     one = names(sliced(two, focus=[ex("Dune")], hops=1, type_links=True))
     assert one == ["Author", "Book", "Dune", "Herbert", "Prefonly"]
@@ -61,6 +74,16 @@ def test_type_links_make_classes_hops_and_a_class_is_a_hub(two):
 def test_type_links_keep_every_kept_nodes_classes_even_at_hops_zero(two):
     data = sliced(two, focus=[ex("Dune")], hops=0, type_links=True)
     assert names(data) == ["Book", "Dune"] and edges(data) == [("Dune", "type", "Book")]
+
+
+def test_type_links_closure_keeps_the_classes_of_kept_classes_too(tmp_path):
+    ttl = tmp_path / "m.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/m#> .\nex:Dune a ex:Book .\nex:Book a ex:Genre .\n",
+                   encoding="utf-8")
+    data = sliced(load.load_files([ttl]), focus=[URIRef("http://example.org/m#Dune")], hops=0,
+                  type_links=True)
+    assert names(data) == ["Book", "Dune", "Genre"]
+    assert edges(data) == [("Book", "type", "Genre"), ("Dune", "type", "Book")]
 
 
 def test_schema_keeps_classes_and_properties_and_drops_individuals(two):
@@ -135,6 +158,7 @@ def test_a_header_referenced_by_a_kept_node_is_dropped_with_its_edge(tmp_path):
     data = graph.build(cut.dataset)
     assert names(data) == ["a"] and data["links"] == []
     assert not list(cut.dataset.merged.triples((None, None, header)))   # the header went with its edge
+    assert not list(cut.dataset.merged.triples((header, None, None)))   # and so did the header's own triples
 
 
 def test_a_focus_that_is_only_a_link_object_has_nothing_of_its_own_at_hops_zero(tmp_path):
