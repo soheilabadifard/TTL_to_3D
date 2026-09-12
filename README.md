@@ -54,8 +54,9 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb)
 
-The same pipeline is a function call. Sources are file paths, `rdflib.Graph` objects,
-`(name, source)` pairs or a `{name: source}` mapping, in any mix; the options are the command line's.
+The same pipeline is a function call (`pip install "ttl3d>=0.3.0"`). Sources are file paths,
+`rdflib.Graph` objects, `(name, source)` pairs or a `{name: source}` mapping, in any mix; the
+options are the command line's.
 
 ```python
 import rdflib, ttl3d
