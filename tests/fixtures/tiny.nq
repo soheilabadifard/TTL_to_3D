@@ -1,0 +1,3 @@
+<http://example.org/nt#a> <http://example.org/nt#links> <http://example.org/nt#b> <http://example.org/nt#G> .
+<http://example.org/nt#a> <http://www.w3.org/2000/01/rdf-schema#label> "A" _:g .
+<http://example.org/nt#a> <http://example.org/nt#links> <http://example.org/nt#c> .

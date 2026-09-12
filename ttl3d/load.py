@@ -1,26 +1,52 @@
-"""Parse one or more RDF files, or in-memory graphs, into a merged graph that
-remembers which source said what."""
+"""Parse one or more RDF sources (files, standard input, in-memory rdflib graphs and datasets) into a
+merged graph that remembers which source said what. A named graph of a quad format (TriG, N-Quads,
+TriX, JSON-LD with named @graph blocks) is a source of its own, keyed by its prefixed IRI.
+
+    path / bytes --rdflib Dataset.parse--> rdflib Dataset --_split--> default graph (+ blank-node graphs)
+    rdflib.Dataset ---------------------------------------_split--> named graphs {IRI: Graph}
+    rdflib.Graph -------------------------------------------------> used as is, no named graphs
+         |                                    one (name, default, named) part per source, in input order
+         v
+    prefixes: namespace -> prefix from every source, first binding wins   (collected before any key)
+         |
+         v
+    keys, source by source:   default graph -> the source name        (~2 on a clash; no key when it
+                                                                        is empty and named graphs exist)
+                              named graphs, sorted by (curie, IRI) -> curie = prefix:local, or the IRI
+                                  same IRI seen before   -> joins that key   (by_iri: IRI -> key)
+                                  key taken by another name -> ~2, ~3
+         |
+         v
+    merged = union of every key. A node belongs to its first key in this order (graph.build), so keys
+    sit where their graph first appeared, even when a later file adds to it.
+"""
 from __future__ import annotations
 
 import os
+import warnings
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from rdflib import Graph
+from rdflib import Dataset as RdfDataset
+from rdflib import Graph, URIRef
+from rdflib.graph import DATASET_DEFAULT_GRAPH_ID
 from rdflib.util import guess_format
 
 
 class LoadError(ValueError):
-    """An input file could not be parsed; the message names the file."""
+    """An input could not be parsed; the message names the file (or `stdin`)."""
 
 
 @dataclass
 class Dataset:
-    files: list[Path]
-    graphs: dict[str, Graph]      # file key -> that file's own triples, in input order
-    merged: Graph                 # union of all files
+    files: list[Path]             # real paths only, in order; stdin and in-memory sources add none
+    graphs: dict[str, Graph]      # legend key -> that source's triples: a source's default graph under
+                                  # its name, each named graph under its prefixed IRI
+    merged: Graph                 # union of every key
     prefixes: dict[str, str]      # namespace IRI -> prefix, first binding wins
+    sources: list[str]            # one name per input, in input order; the page title uses the first
+    named: dict[str, URIRef]      # graph key -> graph IRI, for the keys that came from named graphs
 
     @property
     def stems(self) -> list[str]:
@@ -58,24 +84,74 @@ def local(u, prefixes: Mapping[str, str] | None = None) -> str:
     return split_iri(u, prefixes)[1] or str(u)
 
 
-def _parse(f: Path, fmt: str | None = None) -> Graph:
+def _parsed(name: str, fmt: str, parse) -> RdfDataset:
+    """Run `parse(dataset, fmt)` on a fresh rdflib Dataset, turning any parser failure into a
+    one-line LoadError that names the source."""
+    rds = RdfDataset()
+    try:
+        with warnings.catch_warnings():
+            # rdflib 7.6's Dataset.parse reads its own deprecated default_context and warns
+            warnings.simplefilter("ignore", DeprecationWarning)
+            parse(rds, fmt)
+    except Exception as e:  # every rdflib parser plugin raises its own class
+        # collapse whitespace: rdflib's BadSyntax (and others) embed literal
+        # newlines, and the message must stay on one stderr line
+        detail = " ".join(str(e).split())
+        raise LoadError(f"{name}: cannot parse as {fmt}: {detail}") from e
+    return rds
+
+
+def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
     """Parse one file. Without an explicit format the extension decides; if that
     parser rejects the file, try Turtle once (Turtle saved as .owl is common)."""
-    g = Graph()
     guessed = fmt or guess_format(str(f)) or "turtle"
     try:
-        g.parse(f, format=guessed)
-    except Exception as e:  # every rdflib parser plugin raises its own class
+        return _parsed(str(f), guessed, lambda rds, fm: rds.parse(f, format=fm))
+    except LoadError:
         if fmt is None and guessed != "turtle":
             try:
                 return _parse(f, "turtle")
             except LoadError:
                 pass
-        # collapse whitespace: rdflib's BadSyntax (and others) embed literal
-        # newlines, and the message must stay on one stderr line
-        detail = " ".join(str(e).split())
-        raise LoadError(f"{f}: cannot parse as {guessed}: {detail}") from e
-    return g
+        raise
+
+
+def parse_data(data: bytes, fmt: str | None = None, name: str = "data") -> RdfDataset:
+    """Parse in-memory bytes (the CLI's standard input) as `fmt`, Turtle by default: there is no
+    extension to guess from and no retry. A failure is a LoadError naming `name`. Relative IRIs
+    resolve against the working directory, as rdflib does for data without a base; declare @base
+    in the data to be explicit."""
+    return _parsed(name, fmt or "turtle", lambda rds, fm: rds.parse(data=data, format=fm))
+
+
+def _contexts(rds: RdfDataset):
+    """Every graph of an rdflib Dataset. `graphs()` is missing in rdflib 7.1 and `contexts()`
+    warns from 7.6, so use whichever the installed version has without a deprecation warning."""
+    graphs = getattr(rds, "graphs", None)
+    return graphs() if graphs else rds.contexts()
+
+
+def _split(rds: RdfDataset) -> tuple[Graph, dict[URIRef, Graph]]:
+    """A parsed dataset as (default graph, {graph IRI: graph}). Graphs named by a blank node have
+    no stable name and join the default graph."""
+    default = Graph()
+    named: dict[URIRef, Graph] = {}
+    for ctx in _contexts(rds):
+        ident = ctx.identifier
+        if isinstance(ident, URIRef) and ident != DATASET_DEFAULT_GRAPH_ID:
+            target = named.setdefault(ident, Graph())
+        else:
+            target = default
+        for triple in ctx:
+            target.add(triple)
+    return default, named
+
+
+def _curie(iri: URIRef, prefixes: Mapping[str, str]) -> str:
+    """`prefix:local` (`:local` for the empty default prefix) through split_iri; the IRI itself when
+    its namespace is unbound or nothing follows the namespace."""
+    ns, name = split_iri(iri, prefixes)
+    return f"{prefixes[ns]}:{name}" if name and ns in prefixes else str(iri)
 
 
 # one source; a tuple is always a (name, item) pair, never two sources
@@ -116,31 +192,59 @@ Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph]
 def load(sources: Sources, fmt: str | None = None) -> Dataset:
     """Parse and merge paths and in-memory graphs, keeping which source said what.
 
-    A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph"; a
-    duplicate name gets ~2, ~3. A Graph is used as it is, never copied; the merged union is
-    a new Graph. `fmt` forces one parser for every path, as --format does."""
+    A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph", an
+    rdflib.Dataset by its pair or "dataset"; a duplicate name gets ~2, ~3. A Graph is used as it
+    is, never copied. A quad source (a TriG, N-Quads, TriX or JSON-LD file, or an rdflib.Dataset)
+    contributes its default graph under the source name and every named graph under its prefixed
+    IRI (`ex:planets`); the same graph IRI in several sources is one key, sitting where the graph
+    first appeared. `fmt` forces one parser for every path, as --format does."""
     files: list[Path] = []
-    graphs: dict[str, Graph] = {}
-    merged = Graph()
+    names: list[str] = []
     prefixes: dict[str, str] = {}
+    parts: list[tuple[str, Graph, dict[URIRef, Graph]]] = []    # (name, default graph, named graphs)
     for item in _items(sources):
         name, obj = _named(item)
-        if isinstance(obj, Graph):
-            g, key = obj, name or "graph"
+        if isinstance(obj, RdfDataset):                          # before Graph: a Dataset is a Graph
+            key, bound = name or "dataset", obj
+            default, named_graphs = _split(obj)
+        elif isinstance(obj, Graph):
+            key, bound = name or "graph", obj
+            default, named_graphs = obj, {}
         elif isinstance(obj, (str, os.PathLike)):
             f = Path(obj)
             if not f.is_file():
                 raise FileNotFoundError(f)
-            g, key = _parse(f, fmt), name or f.stem
+            rds = _parse(f, fmt)
+            key, bound = name or f.stem, rds
+            default, named_graphs = _split(rds)
             files.append(f)
         else:
             raise TypeError(_NOT_A_SOURCE.format(type(obj).__name__))
-        graphs[_unique_key(key, graphs)] = g
+        names.append(key)
+        parts.append((key, default, named_graphs))
+        for prefix, ns in bound.namespaces():
+            prefixes.setdefault(str(ns), prefix)
+    # keys are assigned only now, so a prefix bound by a later source shortens every graph name
+    graphs: dict[str, Graph] = {}
+    named: dict[str, URIRef] = {}       # key -> graph IRI (Dataset.named)
+    by_iri: dict[URIRef, str] = {}      # graph IRI -> key: the inverse, so identity follows the IRI
+    for key, default, named_graphs in parts:
+        if len(default) or not named_graphs:
+            graphs[_unique_key(key, graphs)] = default
+        for iri in sorted(named_graphs, key=lambda i: (_curie(i, prefixes), str(i))):
+            if iri in by_iri:                                    # the same graph, asserted by another source
+                for triple in named_graphs[iri]:
+                    graphs[by_iri[iri]].add(triple)
+                continue
+            gkey = _unique_key(_curie(iri, prefixes), graphs)
+            graphs[gkey] = named_graphs[iri]
+            named[gkey] = iri
+            by_iri[iri] = gkey
+    merged = Graph()
+    for g in graphs.values():
         for triple in g:
             merged.add(triple)
-        for prefix, ns in g.namespaces():
-            prefixes.setdefault(str(ns), prefix)
-    return Dataset(files, graphs, merged, prefixes)
+    return Dataset(files, graphs, merged, prefixes, names, named)
 
 
 def load_files(paths: Iterable[str | Path], fmt: str | None = None) -> Dataset:

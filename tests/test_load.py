@@ -1,6 +1,6 @@
 """ttl3d.load: parse one or more RDF files, keeping which file said what."""
 import pytest
-from rdflib import Graph, Namespace
+from rdflib import Graph, Namespace, URIRef
 
 from ttl3d import load
 
@@ -157,3 +157,39 @@ def test_local_and_namespace_of_keep_their_old_results_without_prefixes():
     assert load.local("http://e/a#b") == "b" and load.namespace_of("http://e/a#b") == "http://e/a#"
     assert load.local("http://e/a/") == "http://e/a/"  # empty local part is the IRI itself
     assert load.local("urn:x") == "urn:x" and load.namespace_of("urn:x") == ""
+
+
+def test_a_trig_file_keys_its_default_graph_by_stem_and_each_named_graph_by_prefixed_iri(library_trig):
+    ds = load.load_files([library_trig])
+    assert ds.stems == ["library", ":catalogue", "ex:extra"]     # default graph first, then sorted by key
+    assert ds.sources == ["library"]
+    assert ds.named == {":catalogue": URIRef("http://example.org/graphs/catalogue"),
+                        "ex:extra": URIRef("http://example.org/library#extra")}
+    assert sum(len(g) for g in ds.graphs.values()) == 38          # every quad of the file survives
+    assert len(ds.merged) == 37                                  # "Dune" is labelled in two graphs
+    assert ds.files == [library_trig]
+
+
+def test_an_nquads_blank_node_graph_joins_the_stem_and_an_unbound_graph_iri_stays_whole(tiny_nq):
+    ds = load.load_files([tiny_nq])
+    assert ds.stems == ["tiny", "http://example.org/nt#G"]
+    assert len(ds.graphs["tiny"]) == 2 and len(ds.graphs["http://example.org/nt#G"]) == 1
+    assert ds.named == {"http://example.org/nt#G": URIRef("http://example.org/nt#G")}
+
+
+def test_a_quad_file_with_an_empty_default_graph_has_no_stem_key_but_keeps_its_source_name(tmp_path):
+    trig = tmp_path / "only.trig"
+    trig.write_text("@prefix ex: <http://example.org/o#> .\nex:g { ex:a ex:p ex:b . }\n", encoding="utf-8")
+    ds = load.load_files([trig])
+    assert ds.stems == ["ex:g"] and ds.sources == ["only"]
+
+
+def test_an_empty_turtle_file_still_has_its_one_key(tmp_path):
+    empty = tmp_path / "empty.ttl"
+    empty.write_text("", encoding="utf-8")
+    assert load.load_files([empty]).stems == ["empty"]
+
+
+def test_plain_files_and_graph_sources_carry_no_named_graphs(library):
+    ds = load.load([library, ("mem", _mem_graph())])
+    assert ds.named == {} and ds.sources == ["library", "mem"]

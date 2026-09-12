@@ -18,3 +18,13 @@ def library_extra():
 @pytest.fixture
 def tiny_nt():
     return FIXTURES / "tiny.nt"
+
+
+@pytest.fixture
+def library_trig():
+    return FIXTURES / "library.trig"
+
+
+@pytest.fixture
+def tiny_nq():
+    return FIXTURES / "tiny.nq"
