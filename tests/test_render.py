@@ -247,4 +247,18 @@ def test_inlined_viewer_assets_carry_lf_newlines_only():
 
 def test_the_card_calls_the_owning_file_or_graph_a_source():
     js = render.viewer_source()
-    assert "<td>source</td><td>${esc(n.file)}</td>" in js and "<td>file</td>" not in js
+    assert "<td>source</td><td>${esc(n.file)}" in js and "<td>file</td>" not in js
+
+
+def test_named_graph_iris_reach_the_page_and_title_their_legend_rows(library_trig):
+    trig = graph.build(load.load_files([library_trig]))
+    page = render.render_html(trig, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert '"graphs": {' in page and "graphs/catalogue" in page                   # DATA.graphs
+    assert 'data-group=":catalogue" title="http://example.org/graphs/catalogue"' in page
+    assert 'data-group="library"><span' in page                                    # a file key: no title
+
+
+def test_the_card_shows_the_graph_iri_under_the_source_key():
+    js = render.viewer_source()
+    assert "(DATA.graphs || {})[n.file]" in js
+    assert '<div class="iri">${esc(iri)}</div>' in js

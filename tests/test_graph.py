@@ -328,3 +328,9 @@ def test_a_source_with_several_identifier_urls_shows_the_smallest_whatever_the_h
                            check=False, env={**os.environ, "PYTHONHASHSEED": seed}).stdout.strip()
             for seed in ("1", "2", "3")}
     assert urls == {"http://a.example/one"}
+
+
+def test_build_returns_the_graph_iri_behind_each_named_graph_key(library_trig, library):
+    assert build(library_trig)["graphs"] == {":catalogue": "http://example.org/graphs/catalogue",
+                                             "ex:extra": "http://example.org/library#extra"}
+    assert build(library)["graphs"] == {}                          # plain files: no named graphs

@@ -127,7 +127,9 @@ function showNode(n) {
   h += `<div class="cls">${esc(n.types.join(', ') || 'untyped')} · ${esc(n.group)}</div>`;
   h += `<div class="iri">${esc(n.id)}</div>`;
   if (n.definition) h += `<p class="def">${esc(n.definition)}</p>`;
-  h += `<table><tr><td>source</td><td>${esc(n.file)}</td></tr>` +
+  const iri = (DATA.graphs || {})[n.file];        // the IRI behind a named-graph key, if the owner is one
+  h += `<table><tr><td>source</td><td>${esc(n.file)}` +
+       (iri ? `<div class="iri">${esc(iri)}</div>` : '') + `</td></tr>` +
        `<tr><td>namespace</td><td>${esc(n.ns)}</td></tr></table>`;
   if (n.alt && n.alt.length)
     h += `<h3>also known as</h3>` + n.alt.map(a => `<span class="chip">${esc(a)}</span>`).join('');

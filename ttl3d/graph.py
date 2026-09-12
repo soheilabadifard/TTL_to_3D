@@ -186,4 +186,5 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
     groups = {n["group"] for n in nodes}
     if color_by == "file":
         groups |= {l["group"] for l in links}
-    return {"nodes": nodes, "links": links, "groups": sorted(groups), "color_by": color_by}
+    return {"nodes": nodes, "links": links, "groups": sorted(groups), "color_by": color_by,
+            "graphs": {key: str(iri) for key, iri in ds.named.items()}}   # legend key -> named-graph IRI

@@ -371,3 +371,25 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
         finally:
             browser.close()
     assert errors == []
+
+
+def test_the_card_of_a_node_from_a_named_graph_shows_the_graph_iri(tmp_path):
+    out = tmp_path / "trig.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.trig"),
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            assert page.get_attribute(".row.grp[data-group=':catalogue']", "title") == \
+                "http://example.org/graphs/catalogue"
+            page.evaluate("showNode(Graph.graphData().nodes.find(n => n.label === 'Dune'))")
+            text = page.inner_text("#detail")
+            assert ":catalogue" in text and "http://example.org/graphs/catalogue" in text
+        finally:
+            browser.close()
+    assert errors == []

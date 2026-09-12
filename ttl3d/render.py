@@ -58,10 +58,13 @@ def assign_colors(groups, counts=None) -> dict:
     return colors
 
 
-def _legend(groups, colors, counts) -> str:
+def _legend(groups, colors, counts, graphs=None) -> str:
+    """One clickable row per coloured group; a named-graph key carries its IRI as the hover title."""
     esc = lambda s: _html.escape(str(s), quote=True)
+    graphs = graphs or {}
+    title = lambda g: f' title="{esc(graphs[g])}"' if g in graphs else ""
     top, rest = rank_groups(groups, counts)
-    rows = [f'<div class="row grp" data-group="{esc(g)}"><span class="dot" '
+    rows = [f'<div class="row grp" data-group="{esc(g)}"{title(g)}><span class="dot" '
             f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>'
             for g in groups if g in top or g == "?"]
     if rest:
@@ -113,7 +116,7 @@ def render_html(data: dict, *, title: str, pinned: bool, labels: dict, view: str
     esc = lambda s: _html.escape(str(s), quote=True)
     counts = group_counts(data)
     colors = assign_colors(data["groups"], counts)
-    legend = _legend(data["groups"], colors, counts)
+    legend = _legend(data["groups"], colors, counts, data.get("graphs"))
     config = {"title": title, "colorBy": data.get("color_by", "file"),
               "pinned": bool(pinned), "labels": {"node": bool(labels["node"]),
                                                  "edge": bool(labels["edge"])},
