@@ -6,7 +6,7 @@ import pytest
 from rdflib import RDF, RDFS, Graph, Literal, Namespace, URIRef
 
 import ttl3d
-from ttl3d import api, cli, layout
+from ttl3d import api, cli, layout, load
 
 EX = Namespace("http://example.org/mem#")
 
@@ -177,3 +177,28 @@ def test_show_checks_the_height_when_called_not_when_displayed(library):
     with pytest.raises(ValueError):
         ttl3d.show(library, height="tall")
     assert ttl3d.show(library, height=500.0).height == 500
+
+
+def test_an_rdflib_dataset_source_renders_its_named_graphs_as_groups(library_trig):
+    rds = load.parse_data(library_trig.read_bytes(), "trig")
+    data = _page_data(ttl3d.to_html(("lib", rds)))
+    assert data["groups"] == [":catalogue", "ex:extra", "lib"]      # graph.build sorts the groups
+    assert len(data["nodes"]) == 12 and len(data["links"]) == 6
+
+
+def test_the_title_defaults_to_the_source_name_even_when_its_default_graph_is_empty(tmp_path):
+    trig = tmp_path / "only.trig"
+    trig.write_text("@prefix ex: <http://example.org/o#> .\nex:g { ex:a ex:p ex:b . }\n", encoding="utf-8")
+    html = ttl3d.to_html(trig)
+    assert "<title>only</title>" in html and _page_data(html)["groups"] == ["ex:g"]
+
+
+def test_an_empty_source_list_is_rejected_before_any_work():
+    with pytest.raises(ValueError, match="at least one source"):
+        ttl3d.to_html([])
+
+
+def test_write_and_the_cli_agree_on_a_trig_file(tmp_path, library_trig):
+    via_api = ttl3d.write(library_trig, tmp_path / "api.html")
+    assert cli.main([str(library_trig), "-o", str(tmp_path / "cli.html")]) == 0
+    assert via_api.read_bytes() == (tmp_path / "cli.html").read_bytes()

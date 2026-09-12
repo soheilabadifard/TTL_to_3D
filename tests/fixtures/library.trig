@@ -1,0 +1,32 @@
+@prefix ex:   <http://example.org/library#> .
+@prefix :     <http://example.org/graphs/> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# the default graph: the schema, as library.ttl declares it
+<http://example.org/library> a owl:Ontology ; rdfs:label "Library test ontology" .
+ex:Book   a owl:Class ; rdfs:label "Book" ; rdfs:subClassOf owl:Thing ; skos:definition "A written work." .
+ex:Person a owl:Class ; rdfs:label "Person" .
+ex:Author a owl:Class ; rdfs:subClassOf ex:Person ; rdfs:label "Author" .
+ex:wrote  a owl:ObjectProperty ; rdfs:label "wrote" ; rdfs:domain ex:Author ; rdfs:range ex:Book .
+ex:pages  a owl:DatatypeProperty ; rdfs:label "pages" .
+
+# a named graph under the empty default prefix: the individuals of library.ttl
+:catalogue {
+  ex:Dune      a ex:Book ; rdfs:label "Dune" ; ex:pages 412 ; skos:altLabel "Dune (novel)" ;
+               rdfs:comment "Science-fiction novel." .
+  ex:Herbert   a ex:Author, owl:NamedIndividual ; rdfs:label "Frank Herbert" ; ex:wrote ex:Dune .
+  ex:Unlabeled a ex:Book .
+  ex:Prefonly  a ex:Book ; skos:prefLabel "Pref only" .
+  ex:Weird     a ex:Book ; rdfs:label "a </script> label" .
+}
+
+# a named graph under a bound prefix: the triples of library-extra.ttl
+ex:extra {
+  ex:Dune ex:relatedTo ex:Prefonly .
+  ex:Dune rdfs:label "Dune" .
+  ex:Asimov     a ex:Author ; rdfs:label "Isaac Asimov" ; ex:wrote ex:Foundation .
+  ex:Foundation a ex:Book ; rdfs:label "Foundation" .
+}

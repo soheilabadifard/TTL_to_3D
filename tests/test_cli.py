@@ -113,14 +113,17 @@ def test_cli_announces_a_big_stress_layout_on_stderr(tmp_path, capsys):
     assert "stress layout" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("view", ["3d", "2d"])
-def test_cli_output_is_identical_across_processes(tmp_path, view):
+SOLAR = ("examples/solar-system.ttl", "examples/solar-system-missions.ttl")
+TRIG = ("tests/fixtures/library.trig",)
+
+
+@pytest.mark.parametrize(("view", "inputs"), [("3d", SOLAR), ("2d", SOLAR), ("3d", TRIG)],
+                         ids=["solar-3d", "solar-2d", "trig-3d"])
+def test_cli_output_is_identical_across_processes(tmp_path, view, inputs):
     pages = []
     for seed in ("1", "2"):
-        out = tmp_path / f"solar-{seed}.html"
-        r = subprocess.run([sys.executable, "-m", "ttl3d",
-                            str(REPO / "examples" / "solar-system.ttl"),
-                            str(REPO / "examples" / "solar-system-missions.ttl"),
+        out = tmp_path / f"page-{seed}.html"
+        r = subprocess.run([sys.executable, "-m", "ttl3d", *(str(REPO / p) for p in inputs),
                             "-o", str(out), "--view", view],
                            capture_output=True, text=True, cwd=REPO, check=False,
                            env={**os.environ, "PYTHONHASHSEED": seed})
@@ -225,3 +228,40 @@ def test_the_summary_line_survives_a_console_that_cannot_encode_the_output_path(
                        capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False)
     assert r.returncode == 0 and out.exists(), r.stderr.decode("ascii", "replace")
     assert r.stdout.decode("ascii").split()[0].isdigit()
+
+
+def _run_with_stdin(args, stdin: bytes, cwd):
+    return subprocess.run([sys.executable, "-m", "ttl3d", *args], input=stdin, capture_output=True,
+                          cwd=cwd, check=False)
+
+
+def test_a_dash_reads_turtle_from_standard_input_and_names_the_page_stdin(tmp_path, library):
+    r = _run_with_stdin(["-"], library.read_bytes(), tmp_path)
+    assert r.returncode == 0, r.stderr.decode()
+    page = (tmp_path / "stdin-3d.html").read_text(encoding="utf-8")
+    assert "<title>stdin</title>" in page and b"stdin-3d.html" in r.stdout
+
+
+def test_format_applies_to_standard_input(tmp_path, tiny_nq):
+    r = _run_with_stdin(["-", "--format", "nquads", "-o", "nq.html"], tiny_nq.read_bytes(), tmp_path)
+    assert r.returncode == 0, r.stderr.decode()
+    assert 'nt#G"' in (tmp_path / "nq.html").read_text(encoding="utf-8")     # the named graph is a group
+
+
+def test_a_dash_mixes_with_files(tmp_path, library, library_extra):
+    r = _run_with_stdin([str(library), "-", "-o", "mix.html"], library_extra.read_bytes(), tmp_path)
+    assert r.returncode == 0, r.stderr.decode()
+    assert b"12 nodes" in r.stdout and b"6 links" in r.stdout
+
+
+def test_bad_standard_input_is_a_one_line_error_naming_stdin(tmp_path):
+    r = _run_with_stdin(["-", "-o", "x.html"], b"this is not turtle @@@\n", tmp_path)
+    assert r.returncode == 1
+    err = r.stderr.decode()
+    assert err.startswith("ttl3d: error: stdin: cannot parse as turtle") and err.count("\n") == 1
+    assert not (tmp_path / "x.html").exists()
+
+
+def test_standard_input_can_be_given_only_once(tmp_path, capsys):
+    assert cli.main(["-", "-", "-o", str(tmp_path / "x.html")]) == 1     # fails before reading stdin
+    assert capsys.readouterr().err == "ttl3d: error: standard input can be given only once\n"

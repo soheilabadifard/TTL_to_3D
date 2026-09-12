@@ -21,13 +21,12 @@ too; only IRI sources appear in the node's `sources` list.
 """
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
 
-from .load import Dataset
+from .load import Dataset, local, namespace_of
 
 COLOR_KEYS = ("file", "type", "namespace")
 RESERVED = tuple(str(ns) for ns in (RDF, RDFS, OWL, XSD))
@@ -36,15 +35,6 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
-
-
-def local(u) -> str:
-    return re.split(r"[/#]", str(u))[-1] or str(u)
-
-
-def namespace_of(u) -> str:
-    s = str(u)
-    return s[:max(s.rfind("#"), s.rfind("/")) + 1]
 
 
 def _literals(g, s, p, lang: str | None) -> list:
@@ -101,6 +91,7 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
     if color_by not in COLOR_KEYS:
         raise ValueError(f"color_by must be one of {COLOR_KEYS}, got {color_by!r}")
     g = ds.merged
+    prefixes = ds.prefixes
     headers = set(g.subjects(RDF.type, OWL.Ontology))
 
     def eligible(t) -> bool:
@@ -134,24 +125,26 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
         if is_link(s, p, o):
             node_ids.add(o)
             a, b = sorted((s, o), key=str)
-            merged_links[(a, b)]["fwd" if s == a else "rev"].add(local(p))
+            merged_links[(a, b)]["fwd" if s == a else "rev"].add(local(p, prefixes))
 
     labels = {}
     for s in node_ids:
-        labels[s] = _first(g, s, LABEL_PREDS, lang) or local(s)
-    src_url = {s: str(o) for s, _, o in g.triples((None, DCTERMS.identifier, None))
-               if str(o).startswith("http")}
+        labels[s] = _first(g, s, LABEL_PREDS, lang) or local(s, prefixes)
+    src_url: dict = {}                    # the smallest URL wins, whatever order rdflib yields them in
+    for s, _, o in g.triples((None, DCTERMS.identifier, None)):
+        if str(o).startswith("http") and (s not in src_url or str(o) < src_url[s]):
+            src_url[s] = str(o)
 
     def group_of(n, types) -> str:
         if color_by == "file":
             return node_file.get(n) or mention_file.get(n) or "?"
         if color_by == "type":
             return types[0] if types else "?"
-        return _prefix(ds, namespace_of(n))
+        return _prefix(ds, namespace_of(n, prefixes))
 
     nodes = []
     for n in sorted(node_ids, key=str):
-        types = sorted(local(t) for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
+        types = sorted(local(t, prefixes) for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
         label_vals = [str(o) for p in LABEL_PREDS for o in _literals(g, n, p, lang)]
         definition = _first(g, n, DEFINITION_PREDS, lang)
         def_pred = next((p for p in DEFINITION_PREDS if _literals(g, n, p, lang)), None)
@@ -162,15 +155,15 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
                     continue
                 if p == def_pred and str(o) == definition:
                     continue
-                props[local(p)].append(str(o))
+                props[local(p, prefixes)].append(str(o))
             elif isinstance(o, URIRef) and p in attribute and p != RDF.type and p not in SOURCE_PREDS:
-                props[local(p)].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
+                props[local(p, prefixes)].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
         sources = [{"label": label, "url": src_url.get(s)}
                    for label, s in sorted(
-                       (labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s), s)
+                       (labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s, prefixes), s)
                        for p in SOURCE_PREDS for s in g.objects(n, p) if isinstance(s, URIRef))]
-        ns = namespace_of(n)
+        ns = namespace_of(n, prefixes)
         nodes.append({
             "id": str(n), "label": labels[n], "types": types,
             "file": node_file.get(n) or mention_file.get(n) or "?",

@@ -4,6 +4,21 @@
 
 Nothing yet.
 
+## 0.4.0 (2026-09-12)
+
+Named graphs: TriG and N-Quads files load every graph, and each named graph is a source like a
+file, with a legend row of its own named by its prefixed IRI (`ex:planets`); the file's default graph
+keeps the file's name, and the same graph IRI in several files is one source. Before this a quad
+format silently kept only its default graph; JSON-LD `@graph` blocks with an `@id` and TriX graphs
+were lost the same way and now load too. `-` reads standard input (`--format` or Turtle), and
+`ttl3d.to_html`, `write` and `show` accept an `rdflib.Dataset`. IRIs whose namespace does not end in
+`/` or `#` (URNs, path fragments) now shorten through the longest bound prefix, for legend keys,
+node namespaces and labels alike; pages whose namespaces were already bound are unchanged. The node
+card calls the owning file or graph its "source".
+
+Fixed: a source with several `dcterms:identifier` URLs showed one chosen in hash order; the smallest
+now wins, so the page is identical across runs.
+
 ## 0.3.0 (2026-09-12)
 
 Releases are archived on Zenodo; `CITATION.cff` and the README carry the DOI.

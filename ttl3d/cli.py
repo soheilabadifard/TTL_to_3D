@@ -5,18 +5,21 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, api, graph, layout, render
+from . import __version__, api, graph, layout, load, render
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ttl3d",
         description="Render Turtle / RDF files as one self-contained 2D/3D HTML viewer.")
-    p.add_argument("files", nargs="+", help="RDF files; the format is guessed from the extension")
+    p.add_argument("files", nargs="+",
+                   help="RDF files, or - for standard input; the format is guessed from the extension")
     p.add_argument("-o", "--out",
-                   help="output HTML path (default: <first file stem>-<view>.html in the current directory)")
+                   help="output HTML path (default: <first source name>-<view>.html in the current "
+                        "directory; stdin for -)")
     p.add_argument("--color-by", choices=graph.COLOR_KEYS, default="file",
-                   help="what the node colors and legend mean (default: file)")
+                   help="what the node colors and legend mean (default: file; a named graph of a TriG or "
+                        "N-Quads file counts as a file)")
     p.add_argument("--layout", choices=layout.LAYOUT_MODES, default="auto",
                    help=f"stress = pinned Kamada-Kawai (auto up to {layout.STRESS_MAX_NODES} nodes); "
                         "force = live simulation")
@@ -25,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
                         f"edges up to {layout.LABEL_MAX_LINKS}); hover = tooltips only")
     p.add_argument("--view", choices=render.VIEWS, default="3d",
                    help="starting view; the page can switch between 3d and 2d (default: 3d)")
-    p.add_argument("--title", help="page title (default: first file stem)")
+    p.add_argument("--title", help="page title (default: the first source's name; stdin for -)")
     p.add_argument("--lang", default="en",
                    help="preferred language tag for labels and definitions (default: en); "
                         "untagged literals rank next, other languages become synonyms"
@@ -55,14 +58,21 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="backslashreplace")
     args = build_parser().parse_args(argv)
-    first = Path(args.files[0]).stem
+    if args.files.count("-") > 1:
+        return _fail("standard input can be given only once")
+    first = "stdin" if args.files[0] == "-" else Path(args.files[0]).stem
     out = Path(args.out) if args.out else Path.cwd() / f"{first}-{args.view}.html"
     # by identity, not by spelling: on case-insensitive filesystems Graph.ttl is graph.ttl
-    if out.exists() and any(Path(f).exists() and out.samefile(f) for f in args.files):
+    if out.exists() and any(f != "-" and Path(f).exists() and out.samefile(f) for f in args.files):
         return _fail(f"output {out} is also an input file; pick another -o path")
     try:
+        # "-" becomes a named in-memory source; the API itself never sees the dash
+        sources = [
+            ("stdin", load.parse_data(sys.stdin.buffer.read(), args.format, "stdin"))
+            if f == "-" else f for f in args.files
+        ]
         built = api.build_page(
-            args.files, title=args.title or None,       # --title "" meant "the first stem" before; keep it
+            sources, title=args.title or None,          # --title "" meant "the first stem" before; keep it
             color_by=args.color_by, layout=args.layout, labels=args.labels,
             view=args.view, lang=args.lang, type_links=args.type_links,
             attribute_preds=[t for arg in args.attribute_preds for t in arg.split(",") if t],
