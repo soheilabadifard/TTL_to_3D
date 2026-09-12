@@ -8,15 +8,13 @@ model code.
         |  schema=True : within = U restricted to class and property terms          (schema_terms)
         |  focus given : kept = breadth-first over link triples, both directions, `hops` steps,
         |                never leaving `within`; seeds are always kept              (neighbourhood)
-        |  type_links  : plus each seed's own classes inside `within` (a deeper node's classes
-        |                come along through the BFS itself, since rdf:type is then a link)  (type closure)
+        |  type_links  : plus every kept node's classes inside `within`             (type closure)
         |  neither     : build_page does not call select at all
         v
     kept --copy--> for each source graph, the kept subjects' triples through the subject index; a
-                   triple survives when its object is not an IRI, a kept node, an attribute target,
-                   an ontology header or reserved vocabulary; blank-node objects are followed and
-                   their triples kept whole; sources left empty drop out; merged is rebuilt
-                   --> Dataset' + the size of U
+                   triple survives when its object is not an IRI, a kept node, an attribute target or
+                   reserved vocabulary; blank-node objects are followed and their triples kept whole;
+                   sources left empty drop out; merged is rebuilt --> Dataset' + the size of U
 """
 from __future__ import annotations
 
@@ -90,11 +88,9 @@ def neighbourhood(g: Graph, rules: Rules, seeds: Iterable[URIRef], hops: int, wi
 
 def _copy(source: Graph, kept: set, rules: Rules) -> Graph:
     """The kept subjects' surviving triples from one source graph, through the subject index. An IRI
-    object survives when it is a kept node, an attribute target, an ontology header or reserved
-    vocabulary (never an edge to a dropped node); literals and blank nodes always survive, and a
-    blank node's own triples are kept whole, recursively, so restrictions and lists stay intact. A
-    referenced header is walked too, so its own `rdf:type owl:Ontology` triple survives and
-    graph.build's own Rules.of still recognises it as a header rather than a leaked node."""
+    object survives when it is a kept node, an attribute target or reserved vocabulary (never an edge
+    to a dropped node); literals and blank nodes always survive, and a blank node's own triples are
+    kept whole, recursively, so restrictions and lists stay intact."""
     part = Graph()
     pending, seen = list(kept), set()
     while pending:
@@ -105,9 +101,9 @@ def _copy(source: Graph, kept: set, rules: Rules) -> Graph:
         for triple in source.triples((s, None, None)):
             _, p, o = triple
             if isinstance(s, BNode) or not isinstance(o, URIRef) or o in kept or p in rules.attribute \
-                    or o in rules.headers or str(o).startswith(RESERVED):
+                    or str(o).startswith(RESERVED):
                 part.add(triple)
-                if isinstance(o, BNode) or o in rules.headers:
+                if isinstance(o, BNode):
                     pending.append(o)
     return part
 
@@ -126,9 +122,8 @@ def select(ds: Dataset, *, focus: Iterable[URIRef] = (), hops: int = 1, schema: 
         raise ValueError("; ".join(f"focus <{m}> is not a node in the data" for m in missing))
     within = schema_terms(g, rules, nodes) if schema else nodes
     kept = neighbourhood(g, rules, seeds, hops, within) if seeds else within
-    if type_links:      # a seed's own classes come along even at hops=0, so its card keeps its type;
-        kept |= {o for s in seeds for o in g.objects(s, RDF.type) if o in within}  # deeper hops reach
-        # a neighbour's classes through the BFS itself, since rdf:type is a link when type_links is set
+    if type_links:      # a kept node's classes come along, so cards and colours keep their types
+        kept |= {o for s in list(kept) for o in g.objects(s, RDF.type) if o in within}
     graphs: dict[str, Graph] = {}
     named: dict[str, URIRef] = {}
     for key, source in ds.graphs.items():

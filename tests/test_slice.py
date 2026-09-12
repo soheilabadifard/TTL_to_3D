@@ -53,7 +53,7 @@ def test_one_hop_follows_links_both_ways_but_never_an_attribute(two):
 
 def test_type_links_make_classes_hops_and_a_class_is_a_hub(two):
     one = names(sliced(two, focus=[ex("Dune")], hops=1, type_links=True))
-    assert one == ["Book", "Dune", "Herbert", "Prefonly"]
+    assert one == ["Author", "Book", "Dune", "Herbert", "Prefonly"]
     assert names(sliced(two, focus=[ex("Dune")], hops=2, type_links=True)) == [
         "Author", "Book", "Dune", "Foundation", "Herbert", "Prefonly", "Unlabeled", "Weird", "wrote"]
 
@@ -124,14 +124,17 @@ def test_named_graphs_left_empty_leave_the_legend_but_not_the_title(library_trig
     assert result.dataset.sources == ["library"]
 
 
-def test_a_header_referenced_by_a_kept_node_does_not_become_a_node(tmp_path):
+def test_a_header_referenced_by_a_kept_node_is_dropped_with_its_edge(tmp_path):
     ttl = tmp_path / "h.ttl"
-    ttl.write_text("@prefix ex: <http://example.org/h#> .\n" + OWL
+    ttl.write_text("@prefix ex: <http://example.org/h#> .\n" + OWL + RDFS
                    + "<http://example.org/h> a owl:Ontology .\n"
-                   + "ex:a ex:p <http://example.org/h> ; ex:q ex:b .\n",
+                   + 'ex:a rdfs:label "A" ; ex:p <http://example.org/h> ; ex:q ex:b .\n',
                    encoding="utf-8")
-    data = sliced(load.load_files([ttl]), focus=[URIRef("http://example.org/h#a")], hops=0)
+    a, header = URIRef("http://example.org/h#a"), URIRef("http://example.org/h")
+    cut = slice.select(load.load_files([ttl]), focus=[a], hops=0)
+    data = graph.build(cut.dataset)
     assert names(data) == ["a"] and data["links"] == []
+    assert not list(cut.dataset.merged.triples((None, None, header)))   # the header went with its edge
 
 
 def test_a_focus_that_is_only_a_link_object_has_nothing_of_its_own_at_hops_zero(tmp_path):
