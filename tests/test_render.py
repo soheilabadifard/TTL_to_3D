@@ -262,3 +262,29 @@ def test_the_card_shows_the_graph_iri_under_the_source_key():
     js = render.viewer_source()
     assert "(DATA.graphs || {})[n.file]" in js
     assert '<div class="iri">${esc(iri)}</div>' in js
+
+
+def test_group_counts_credit_every_asserting_source_with_its_links(tmp_path):
+    for name in ("first", "second"):
+        (tmp_path / f"{name}.ttl").write_text("@prefix ex: <http://example.org/f#> .\nex:a ex:p ex:b .\n",
+                                              encoding="utf-8")
+    data = graph.build(load.load_files([tmp_path / "first.ttl", tmp_path / "second.ttl"]))
+    assert render.group_counts(data) == {"first": 3, "second": 1}     # two nodes and a link; the same link
+
+
+def test_an_annotation_only_source_gets_a_muted_legend_row_that_explains_itself(tmp_path, library):
+    notes = tmp_path / "notes.ttl"
+    notes.write_text("@prefix ex: <http://example.org/library#> .\n"
+                     "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                     'ex:Dune rdfs:comment "Annotated elsewhere." .\n', encoding="utf-8")
+    data = graph.build(load.load_files([library, notes]))
+    page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
+    assert ('class="row grp annot" data-group="notes" '
+            'title="declares no node and asserts no edge; its labels are on the cards"') in page
+    assert 'class="row grp" data-group="library"><span' in page
+
+
+def test_the_filter_keeps_the_edges_every_selected_source_asserts():
+    js = render.viewer_source()
+    assert js.count("l.files.some(f => activeGroups.has(f))") == 2      # edgeKeep and grpLink
+    assert "activeGroups.has(l.group)" not in js

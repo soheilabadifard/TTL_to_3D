@@ -393,3 +393,34 @@ def test_the_card_of_a_node_from_a_named_graph_shows_the_graph_iri(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_selecting_a_re_asserting_source_keeps_its_edge_and_an_annotation_only_source_dims_all(tmp_path):
+    prefix = "@prefix ex: <http://example.org/library#> .\n"
+    (tmp_path / "again.ttl").write_text(prefix + "ex:Herbert ex:wrote ex:Dune .\n", encoding="utf-8")
+    (tmp_path / "notes.ttl").write_text(prefix + "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                                        'ex:Dune rdfs:comment "Annotated elsewhere." .\n', encoding="utf-8")
+    out = tmp_path / "three.html"
+    r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.ttl"),
+                        str(tmp_path / "again.ttl"), str(tmp_path / "notes.ttl"), "-o", str(out)],
+                       capture_output=True, text=True, cwd=REPO, check=False)
+    assert r.returncode == 0, r.stderr
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = _launch(p)
+        try:
+            page = _new_page(browser, errors)
+            page.goto(out.as_uri())
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            assert page.evaluate("document.querySelectorAll('.row.grp').length") == 3   # every source
+            page.click(".row.grp[data-group='again']")
+            kept = page.evaluate("DATA.nodes.filter(n => !n._dim).map(n => n.label).sort()")
+            assert kept == ["Dune", "Frank Herbert"]           # the endpoints of the edge `again` re-asserts
+            page.click(".row.grp[data-group='again']")
+            page.click(".row.grp[data-group='notes']")
+            assert page.evaluate("DATA.nodes.filter(n => !n._dim).length") == 0   # nothing drawable
+            assert page.evaluate("document.querySelector('.row.grp[data-group=\"notes\"]')"
+                                 ".classList.contains('annot')")
+        finally:
+            browser.close()
+    assert errors == []

@@ -184,8 +184,8 @@ function applyFilter() {
   const edgeKeep = new Set();   // endpoints of edges the selected groups assert
   if (activeGroups.size) {
     DATA.nodes.forEach(n => { if (activeGroups.has(n.group)) core.add(n.id); });
-    DATA.links.forEach(l => {
-      if (l.group && activeGroups.has(l.group)) {
+    DATA.links.forEach(l => {                       // every source that asserts the edge, not only the first
+      if (l.files.some(f => activeGroups.has(f))) {
         edgeKeep.add(idOf(l.source)); edgeKeep.add(idOf(l.target));
       }
     });
@@ -201,7 +201,7 @@ function applyFilter() {
     n._dim = !(isKept(n) && qOk);
   });
   DATA.links.forEach(l => {
-    const grpLink = l.group && activeGroups.has(l.group);
+    const grpLink = l.files.some(f => activeGroups.has(f));
     const touchesCore = !activeGroups.size ||
       core.has(idOf(l.source)) || core.has(idOf(l.target));
     l._dim = (l.source._dim && l.target._dim) || !(touchesCore || grpLink);

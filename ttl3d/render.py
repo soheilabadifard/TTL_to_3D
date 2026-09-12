@@ -30,13 +30,14 @@ UNKNOWN_COLOR = "#9ca3af"
 OTHER_COLOR = "#94a3b8"
 MAX_COLORED_GROUPS = 11   # past len(PALETTE) groups, only the largest keep a colour
 VIEWS = ("3d", "2d")      # the starting view; the page switches between them
+ANNOTATION_ONLY = "declares no node and asserts no edge; its labels are on the cards"
 
 
 def group_counts(data: dict) -> dict:
-    """Nodes per group; in file mode a file also counts the links it asserts."""
+    """Nodes per group; in file mode every source also counts the links it asserts."""
     counts = Counter(n["group"] for n in data["nodes"])
     if data.get("color_by") == "file":
-        counts.update(l["group"] for l in data["links"] if l["group"])
+        counts.update(f for l in data["links"] for f in l["files"])
     return dict(counts)
 
 
@@ -59,14 +60,21 @@ def assign_colors(groups, counts=None) -> dict:
 
 
 def _legend(groups, colors, counts, graphs=None) -> str:
-    """One clickable row per coloured group; a named-graph key carries its IRI as the hover title."""
+    """One clickable row per coloured group. A named-graph key carries its IRI as the hover title; a
+    source that owns no node and asserts no link (count 0) is muted and its title says why."""
     esc = lambda s: _html.escape(str(s), quote=True)
     graphs = graphs or {}
-    title = lambda g: f' title="{esc(graphs[g])}"' if g in graphs else ""
     top, rest = rank_groups(groups, counts)
-    rows = [f'<div class="row grp" data-group="{esc(g)}"{title(g)}><span class="dot" '
-            f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>'
-            for g in groups if g in top or g == "?"]
+
+    def row(g):
+        annot = g != "?" and not counts.get(g)
+        hints = ([esc(graphs[g])] if g in graphs else []) + ([ANNOTATION_ONLY] if annot else [])
+        title = f' title="{". ".join(hints)}"' if hints else ""
+        cls = "row grp annot" if annot else "row grp"
+        return (f'<div class="{cls}" data-group="{esc(g)}"{title}><span class="dot" '
+                f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>')
+
+    rows = [row(g) for g in groups if g in top or g == "?"]
     if rest:
         rows.append(f'<div class="row grp" data-groups="{esc(json.dumps(rest))}"><span class="dot" '
                     f'style="background:{OTHER_COLOR}"></span>other ({len(rest)} groups)</div>')

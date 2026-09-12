@@ -334,3 +334,19 @@ def test_build_returns_the_graph_iri_behind_each_named_graph_key(library_trig, l
     assert build(library_trig)["graphs"] == {":catalogue": "http://example.org/graphs/catalogue",
                                              "ex:extra": "http://example.org/library#extra"}
     assert build(library)["graphs"] == {}                          # plain files: no named graphs
+
+
+def _notes(tmp_path):
+    """A source that only annotates a node another source declares: it owns nothing drawable."""
+    notes = tmp_path / "notes.ttl"
+    notes.write_text("@prefix ex: <http://example.org/library#> .\n"
+                     "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                     'ex:Dune rdfs:comment "Annotated elsewhere." .\n', encoding="utf-8")
+    return notes
+
+
+def test_a_source_that_only_annotates_still_gets_a_legend_group_in_file_mode(tmp_path, library):
+    data = build(library, _notes(tmp_path))
+    assert data["groups"] == ["library", "notes"]                     # every source is a legend row
+    assert all(n["file"] == "library" for n in data["nodes"])         # although it owns no node
+    assert "notes" not in build(library, _notes(tmp_path), color_by="type")["groups"]
