@@ -92,3 +92,33 @@ def write(sources: Sources, out: str | os.PathLike, **options: Any) -> Path:
     """Render and write the page (UTF-8, LF newlines, parent directories created); the options
     of `to_html`. Returns the path written."""
     return _render.write_html(to_html(sources, **options), out)
+
+
+@dataclass
+class Page:
+    """A rendered page that notebooks display inline: Jupyter, JupyterLab, VS Code and Colab
+    call `_repr_html_`, which returns an iframe carrying the whole page in `srcdoc`. Nothing is
+    written to disk and no server is needed; each output stores the full page (about 1.9 MB,
+    measured) in the notebook file."""
+    html: str
+    height: int = 600
+
+    def _repr_html_(self) -> str:
+        # Escape for the srcdoc attribute: avoid double-escaping entities already in self.html.
+        # Replace unsafe characters but not & (which is already part of entities like &quot;).
+        escaped = self.html.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+        return (f'<iframe srcdoc="{escaped}" sandbox="allow-scripts" '
+                f'style="width:100%;height:{int(self.height)}px;border:0" title="ttl3d"></iframe>')
+
+    def write(self, out) -> Path:
+        """Write the page (UTF-8, LF newlines, parents created) and return the path."""
+        return _render.write_html(self.html, out)
+
+    def __repr__(self) -> str:      # never dump 1.9 MB into a terminal
+        return f"Page({len(self.html)} bytes, height={self.height})"
+
+
+def show(sources: Sources, *, height: int = 600, **options: Any) -> Page:
+    """Render for a notebook: the options of `to_html`, plus the iframe height in pixels.
+    The last expression of a cell is displayed, so `ttl3d.show(...)` alone shows the page."""
+    return Page(to_html(sources, **options), int(height))    # a bad height fails here, not at display time

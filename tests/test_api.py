@@ -139,3 +139,36 @@ def test_the_cli_still_announces_the_stress_layout_on_stderr(tmp_path, library, 
     assert cli.main([str(library), str(library_extra), "-o", str(tmp_path / "lib.html")]) == 0
     captured = capsys.readouterr()
     assert "stress" in captured.err.lower() and captured.out.startswith("12 nodes")
+
+
+def test_show_returns_a_page_that_notebooks_render_as_a_sandboxed_iframe(library):
+    page = ttl3d.show(library, height=420)
+    assert isinstance(page, ttl3d.Page) and page.html == ttl3d.to_html(library)
+    tag = page._repr_html_()
+    assert tag.startswith("<iframe srcdoc=\"") and tag.endswith("</iframe>")
+    assert 'sandbox="allow-scripts"' in tag and "height:420px" in tag and "allow-same-origin" not in tag
+
+
+def test_the_iframe_escapes_a_page_that_could_break_out_of_the_attribute(library):
+    page = ttl3d.show(library, title='Say "hi" </iframe><script>')
+    tag = page._repr_html_()
+    assert tag.count("</iframe>") == 1 and "<script" not in tag[len("<iframe srcdoc=\""):]
+    assert "&quot;hi&quot;" in tag and "&lt;/iframe&gt;" in tag
+
+
+def test_page_repr_is_short_and_write_writes_the_html(tmp_path, library):
+    page = ttl3d.show(library)
+    assert repr(page) == f"Page({len(page.html)} bytes, height=600)"
+    out = page.write(tmp_path / "lib.html")
+    assert out.read_text(encoding="utf-8") == page.html
+
+
+def test_the_package_promises_exactly_these_names():
+    expected = ["Page", "Source", "Sources", "__version__", "show", "to_html", "write"]  # ruff RUF022
+    assert ttl3d.__all__ == expected
+
+
+def test_show_checks_the_height_when_called_not_when_displayed(library):
+    with pytest.raises(ValueError):
+        ttl3d.show(library, height="tall")
+    assert ttl3d.show(library, height=500.0).height == 500
