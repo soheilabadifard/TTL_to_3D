@@ -45,7 +45,8 @@ class Dataset:
                                   # its name, each named graph under its prefixed IRI
     merged: Graph                 # union of every key
     prefixes: dict[str, str]      # namespace IRI -> prefix, first binding wins
-    sources: list[str]            # one name per input, in input order; the page title uses the first
+    sources: list[str]            # one name per input, in input order (not a key: a duplicate name is
+                                  # suffixed in graphs); the title uses the first
     named: dict[str, URIRef]      # graph key -> graph IRI, for the keys that came from named graphs
 
     @property
@@ -125,7 +126,7 @@ def parse_data(data: bytes, fmt: str | None = None, name: str = "data") -> RdfDa
 
 
 def _contexts(rds: RdfDataset):
-    """Every graph of an rdflib Dataset. `graphs()` is missing in rdflib 7.1 and `contexts()`
+    """Every graph of an rdflib Dataset. `graphs()` is missing in rdflib 7.0 and 7.1 and `contexts()`
     warns from 7.6, so use whichever the installed version has without a deprecation warning."""
     graphs = getattr(rds, "graphs", None)
     return graphs() if graphs else rds.contexts()
