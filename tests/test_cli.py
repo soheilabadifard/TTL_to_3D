@@ -305,11 +305,23 @@ def test_hops_needs_focus_and_bad_focus_or_hops_are_one_line_errors(tmp_path, li
 
 
 def test_a_bad_hop_count_is_refused_before_standard_input_is_read(tmp_path):
-    # a pipe that would block forever if the CLI read it first: the error must arrive without a parse
-    r = subprocess.run([sys.executable, "-m", "ttl3d", "-", "--focus", "ex:a", "--hops", "-1",
-                        "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
-                       capture_output=True, text=True, cwd=REPO, check=False, timeout=30)
-    assert r.returncode == 1 and r.stderr.startswith("ttl3d: error: hops must be a non-negative integer")
+    # the write end stays open and unfed: a CLI that read standard input before checking --hops would
+    # block here until the timeout, so a fast exit with the hops error proves the order
+    proc = subprocess.Popen([sys.executable, "-m", "ttl3d", "-", "--focus", "ex:a", "--hops", "-1",
+                             "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO)
+    try:
+        code = proc.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        pytest.fail("the CLI read standard input before checking --hops")
+    finally:
+        proc.stdin.close()
+    err = proc.stderr.read()
+    proc.stdout.close()
+    proc.stderr.close()
+    assert code == 1 and err.startswith("ttl3d: error: hops must be a non-negative integer")
 
 
 def _generated(tmp_path, subjects=2000, links=9):
