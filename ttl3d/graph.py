@@ -24,6 +24,7 @@ too; only IRI sources appear in the node's `sources` list.
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
@@ -37,6 +38,28 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
+
+
+@dataclass(frozen=True)
+class Rules:
+    """What counts as a node and as a link, shared by build() and slice.select() so a slice keeps
+    exactly what the model would draw. `headers` are the owl:Ontology subjects (never nodes);
+    `attribute` are the predicates shown on the card instead of drawn."""
+    headers: frozenset
+    attribute: frozenset
+
+    @classmethod
+    def of(cls, g, type_links: bool = False, attribute_preds=()) -> Rules:
+        attribute = (set(ATTRIBUTE_PREDS) | set(attribute_preds)) - ({RDF.type} if type_links else set())
+        return cls(frozenset(g.subjects(RDF.type, OWL.Ontology)), frozenset(attribute))
+
+    def eligible(self, t) -> bool:
+        """An IRI that can be a node: not an ontology header, not RDF/RDFS/OWL/XSD vocabulary."""
+        return isinstance(t, URIRef) and t not in self.headers and not str(t).startswith(RESERVED)
+
+    def is_link(self, s, p, o) -> bool:
+        """An IRI-to-IRI triple drawn as an edge: both ends eligible, predicate not an attribute."""
+        return self.eligible(s) and self.eligible(o) and p not in self.attribute
 
 
 def _literals(g, s, p, lang: str | None) -> list:
@@ -94,16 +117,8 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
         raise ValueError(f"color_by must be one of {COLOR_KEYS}, got {color_by!r}")
     g = ds.merged
     prefixes = ds.prefixes
-    headers = set(g.subjects(RDF.type, OWL.Ontology))
-
-    def eligible(t) -> bool:
-        return (isinstance(t, URIRef) and t not in headers
-                and not str(t).startswith(RESERVED))
-
-    attribute = (set(ATTRIBUTE_PREDS) | set(attribute_preds)) - ({RDF.type} if type_links else set())
-
-    def is_link(s, p, o) -> bool:
-        return eligible(s) and eligible(o) and p not in attribute
+    rules = Rules.of(g, type_links, attribute_preds)
+    eligible, is_link, attribute = rules.eligible, rules.is_link, rules.attribute
 
     node_file: dict = {}          # node -> first file declaring it as a subject
     mention_file: dict = {}       # node -> first file asserting a link touching it

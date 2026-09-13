@@ -356,3 +356,12 @@ def test_key_order_is_the_same_across_hash_seeds_and_the_loader_raises_no_deprec
     for r in runs:
         assert r.returncode == 0, r.stderr
     assert runs[0].stdout == runs[1].stdout == "['library', ':catalogue', 'ex:extra']\n"
+
+
+def test_curie_shortens_through_the_bound_prefixes_and_keeps_unbound_iris_whole():
+    p = {"http://example.org/library#": "ex", "http://example.org/graphs/": ""}
+    assert load.curie(URIRef("http://example.org/library#Dune"), p) == "ex:Dune"
+    assert load.curie(URIRef("http://example.org/graphs/catalogue"), p) == ":catalogue"
+    assert load.curie(URIRef("http://example.org/nt#G"), p) == "http://example.org/nt#G"
+    # an IRI ending in / or # has an empty local part: the IRI itself
+    assert load.curie(URIRef("http://example.org/graphs/"), p) == "http://example.org/graphs/"

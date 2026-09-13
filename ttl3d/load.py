@@ -166,9 +166,10 @@ def _split(rds: RdfDataset) -> tuple[Graph, dict[URIRef, Graph]]:
     return default, named
 
 
-def _curie(iri: URIRef, prefixes: Mapping[str, str]) -> str:
-    """`prefix:local` (`:local` for the empty default prefix) through split_iri; the IRI itself when
-    its namespace is unbound or nothing follows the namespace."""
+def curie(iri: URIRef, prefixes: Mapping[str, str]) -> str:
+    """The legend key of a graph IRI, and the short form the slice notice uses: `prefix:local`
+    (`:local` for the empty default prefix) through split_iri; the IRI itself when its namespace is
+    unbound or nothing follows the namespace."""
     ns, name = split_iri(iri, prefixes)
     return f"{prefixes[ns]}:{name}" if name and ns in prefixes else str(iri)
 
@@ -251,12 +252,12 @@ def load(sources: Sources, fmt: str | None = None) -> Dataset:
     for key, default, named_graphs in parts:
         if len(default) or not named_graphs:
             graphs[_unique_key(key, graphs)] = default
-        for iri in sorted(named_graphs, key=lambda i: (_curie(i, prefixes), str(i))):
+        for iri in sorted(named_graphs, key=lambda i: (curie(i, prefixes), str(i))):
             if iri in by_iri:                                    # the same graph, asserted by another source
                 for triple in named_graphs[iri]:
                     graphs[by_iri[iri]].add(triple)
                 continue
-            gkey = _unique_key(_curie(iri, prefixes), graphs)
+            gkey = _unique_key(curie(iri, prefixes), graphs)
             graphs[gkey] = named_graphs[iri]
             named[gkey] = iri
             by_iri[iri] = gkey

@@ -65,7 +65,7 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 
 The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`). Sources are file paths,
 `rdflib.Graph` or `rdflib.Dataset` objects, `(name, source)` pairs or a `{name: source}` mapping, in any mix;
-the options are the command line's.
+the options are the command line's (`focus`, `hops` and `schema` included).
 
 ```python
 import rdflib, ttl3d
@@ -96,6 +96,9 @@ notebook behind the badge.
 | `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, `trig`, `nquads`, ...). Default: guess from the extension, then try Turtle. |
 | `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
 | `--attribute-preds` | `prefix:local`, full IRI, or `<urn:...>` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable; wrap a URN or mailto in angle brackets. |
+| `--focus` | `prefix:local`, full IRI, or `<urn:...>` | Keep only this node's neighbourhood (with `--hops`). Repeatable or comma-separated. |
+| `--hops` | integer, default 1 | How many link steps from a focus node to keep; `0` keeps the focus nodes only. Needs `--focus`. |
+| `--schema` | flag | Keep classes and properties only: the schema, without instances. |
 | `--version` | flag | Print `ttl3d <version>` and exit. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
@@ -132,6 +135,35 @@ source.
   last `/` or `#`. Legend keys, the namespace column and local names all use this one
   rule.
 
+## Slicing a big graph
+
+A knowledge graph of a million triples is not a picture. Two questions are, and both are
+answered at build time, before the layout runs:
+
+```bash
+ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl --focus :Earth --hops 2 -o earth.html
+ttl3d examples/solar-system.ttl examples/solar-system-missions.ttl --schema -o schema.html
+```
+
+`--focus` keeps a node and everything within `--hops` link steps of it, in both directions;
+`rdf:type` and the other card-only predicates are not steps unless `--type-links` makes them
+edges, and with `--type-links` every kept node's classes come along so no card loses its type.
+`--schema` keeps the classes and properties (anything typed as one, used as a type, or joined by
+`rdfs:subClassOf`, `rdfs:subPropertyOf`, `rdfs:domain`, `rdfs:range`, and the OWL equivalence,
+inverse and disjointness predicates) and drops every instance; with `--focus` as well, the walk
+stays inside the schema, and a focus that is itself an instance is kept. A kept node keeps its
+labels, literals, blank-node structure and card-only attributes (a `dcterms:source` target outside
+the slice shows as an IRI); an edge survives only when both ends do; a source left with nothing
+loses its legend row, and a node's source is the first source that still says something about it
+in the slice. ttl3d says what it kept on stderr: `kept 12 of 41 nodes (focus :Earth, 2 hops)`.
+The same three keyword arguments exist on `ttl3d.to_html`, `write` and `show`.
+
+Slicing does not skip the parse: rdflib reads about a million triples in 13 seconds and
+2.3 GB (measured on a 200-class, 200,000-instance file), after which a two-hop slice
+builds in under 1.5 seconds and a schema slice in under 1.5 seconds. The cost of a
+slice follows the triples that survive, not the nodes: one subject with 200,000 literal
+attributes took 4 seconds at hop 0.
+
 ## In the page
 
 - Legend rows filter inclusively: a selected group keeps its own nodes, their
@@ -160,6 +192,8 @@ scene objects, so the automatic modes degrade instead of freezing:
 | up to 800 nodes / 800 links | pinned stress layout | nodes and edges |
 | up to 1000 nodes | pinned stress layout | tooltips for the layer over its threshold |
 | larger | live force simulation | tooltips; switch sprites on from the panel |
+
+For inputs far beyond these sizes, slice them first: see "Slicing a big graph".
 
 The stress layout is computed twice, once per view, so a pinned page takes about
 twice the layout time of 0.1.0.

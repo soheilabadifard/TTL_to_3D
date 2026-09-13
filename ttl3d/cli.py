@@ -38,6 +38,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--attribute-preds", action="append", default=[], metavar="PRED[,PRED...]",
                    help="predicates to show on the card instead of drawing, as prefix:local, full IRIs, "
                         "or <urn:...> in angle brackets (e.g. foaf:homepage,rdfs:seeAlso); repeatable")
+    p.add_argument("--focus", action="append", default=[], metavar="IRI[,IRI...]",
+                   help="keep only this node's neighbourhood (see --hops), as prefix:local, a full IRI or "
+                        "<urn:...>; repeatable")
+    p.add_argument("--hops", type=int, metavar="N",
+                   help="how many link steps from a focus node to keep "
+                        "(default: 1; 0 = the focus nodes only)")
+    p.add_argument("--schema", action="store_true",
+                   help="keep classes and properties only: the schema, without instances")
     p.add_argument("--format", metavar="NAME",
                    help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
                         "default: guess from the extension, then try turtle")
@@ -65,7 +73,14 @@ def main(argv: list[str] | None = None) -> int:
     # by identity, not by spelling: on case-insensitive filesystems Graph.ttl is graph.ttl
     if out.exists() and any(f != "-" and Path(f).exists() and out.samefile(f) for f in args.files):
         return _fail(f"output {out} is also an input file; pick another -o path")
+    if args.hops is not None and not args.focus:
+        return _fail("--hops needs --focus")
+    focus = [t for arg in args.focus for t in arg.split(",") if t]
+    if args.focus and not focus:
+        return _fail("--focus is empty")
+    hops = 1 if args.hops is None else args.hops
     try:
+        api.check_hops(hops)
         # "-" becomes a named in-memory source; the API itself never sees the dash
         sources = [
             ("stdin", load.parse_data(sys.stdin.buffer.read(), args.format, "stdin"))
@@ -76,7 +91,9 @@ def main(argv: list[str] | None = None) -> int:
             color_by=args.color_by, layout=args.layout, labels=args.labels,
             view=args.view, lang=args.lang, type_links=args.type_links,
             attribute_preds=[t for arg in args.attribute_preds for t in arg.split(",") if t],
-            fmt=args.format, notice=lambda message: print(message, file=sys.stderr))
+            fmt=args.format,
+            focus=focus or None, hops=hops,
+            schema=args.schema, notice=lambda message: print(message, file=sys.stderr))
     except (OSError, ValueError) as e:      # LoadError is a ValueError; an unknown prefix too
         return _fail(e)
     try:

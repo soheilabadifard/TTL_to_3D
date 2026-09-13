@@ -202,3 +202,43 @@ def test_write_and_the_cli_agree_on_a_trig_file(tmp_path, library_trig):
     via_api = ttl3d.write(library_trig, tmp_path / "api.html")
     assert cli.main([str(library_trig), "-o", str(tmp_path / "cli.html")]) == 0
     assert via_api.read_bytes() == (tmp_path / "cli.html").read_bytes()
+
+
+def test_focus_hops_and_schema_reach_the_slice(library, library_extra):
+    both = [library, library_extra]
+    assert len(_page_data(ttl3d.to_html(both, focus=["ex:Dune"]))["nodes"]) == 3
+    assert len(_page_data(ttl3d.to_html(both, focus=["ex:Dune"], hops=0))["nodes"]) == 1
+    assert len(_page_data(ttl3d.to_html(both, schema=True))["nodes"]) == 5
+    book = URIRef("http://example.org/library#Book")
+    assert len(_page_data(ttl3d.to_html(both, focus=[book], schema=True))["nodes"]) == 2
+    html = ttl3d.show(both, focus=["ex:Dune"]).html            # show() and write() pass them through
+    assert len(_page_data(html)["nodes"]) == 3
+
+
+def test_hops_is_checked_before_any_file_is_read(tmp_path):
+    with pytest.raises(ValueError, match="hops must be a non-negative integer"):
+        ttl3d.to_html(tmp_path / "missing.ttl", focus=["ex:a"], hops=-1)
+    with pytest.raises(ValueError, match="hops must be a non-negative integer"):
+        ttl3d.to_html(tmp_path / "missing.ttl", focus=["ex:a"], hops=True)
+    api.check_hops(0)                                                       # the shared check itself
+    with pytest.raises(ValueError, match="got 'two'"):
+        api.check_hops("two")
+
+
+def test_hops_without_a_focus_is_ignored_and_an_unknown_focus_is_named(library):
+    assert ttl3d.to_html(library, hops=3) == ttl3d.to_html(library)
+    with pytest.raises(ValueError, match=r"focus <http://example.org/library#Nope> is not a node"):
+        ttl3d.to_html(library, focus=["ex:Nope"])
+    with pytest.raises(ValueError, match="unknown prefix"):
+        ttl3d.to_html(library, focus=["nope:Dune"])
+
+
+def test_build_page_reports_the_slice_through_notice_and_the_api_stays_silent(library, library_extra, capsys):
+    seen = []
+    api.build_page([library, library_extra], focus=["ex:Dune"], notice=seen.append)
+    assert seen == ["kept 3 of 12 nodes (focus ex:Dune, 1 hop)"]
+    seen.clear()
+    api.build_page([library, library_extra], schema=True, focus=["ex:Book"], hops=2, notice=seen.append)
+    assert seen == ["kept 3 of 12 nodes (schema only; focus ex:Book, 2 hops)"]
+    ttl3d.to_html([library, library_extra], focus=["ex:Dune"])
+    assert capsys.readouterr() == ("", "")

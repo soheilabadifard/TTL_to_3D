@@ -4,6 +4,18 @@
 
 Nothing yet.
 
+## 0.6.0 (2026-09-12)
+
+Slicing at build time, for graphs too big to draw: `--focus IRI --hops N` keeps a node's
+neighbourhood over link predicates, `--schema` keeps classes and properties without instances, both
+together keep the neighbourhood inside the schema, and ttl3d prints what it kept (`kept 12 of 41
+nodes (focus :Earth, 2 hops)`). The same keyword arguments exist on `to_html`, `write` and `show`.
+The slice runs on the RDF before the node/link model, keeps blank-node structure whole, brings each
+kept node's classes along under `--type-links`, and leaves cards, legend and named-graph ownership to
+the unchanged model code; an unsliced run is byte-identical to 0.5.0. On a million-triple file the
+parse takes about 13 s; a two-hop slice then builds in under 1.5 s and a schema slice in under
+1.5 s; the cost follows the surviving triples, not the node count.
+
 ## 0.5.0 (2026-09-12)
 
 Every source has a legend row, including a file or named graph that only annotates other sources'

@@ -61,6 +61,12 @@ The nodes and links merge into one graph, the legend shows which file declared e
 row on a card names the files asserting it. That is the case ttl3d was written for, and the
 <a href="solar-system.html">Solar System demo</a> shows it with two files.</p>
 
+<h2>Too big to draw</h2>
+<p>A knowledge graph of a million triples needs a question first. <code>ttl3d solar-system.ttl
+solar-system-missions.ttl --focus :Earth --hops 2</code> keeps Earth and everything within two links of
+it, 12 of the demo's 41 nodes; <code>--schema</code> on the same files keeps the classes and properties
+and drops the instances, 11 nodes. Both run before the layout, and ttl3d prints what it kept on stderr.</p>
+
 <h2>From Python</h2>
 <p>The same pipeline is a function call, and the options are the command line's:</p>
 <pre><code>import rdflib, ttl3d
