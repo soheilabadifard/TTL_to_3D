@@ -155,12 +155,12 @@ stays inside the schema, and a focus that is itself an instance is kept. A kept 
 labels, literals, blank-node structure and card-only attributes (a `dcterms:source` target outside
 the slice shows as an IRI); an edge survives only when both ends do; a source left with nothing
 loses its legend row, and a node's source is the first source that still says something about it
-in the slice. ttl3d says what it kept on stderr: `kept 41 of 200 nodes (focus :Earth, 2 hops)`.
+in the slice. ttl3d says what it kept on stderr: `kept 12 of 41 nodes (focus :Earth, 2 hops)`.
 The same three keyword arguments exist on `ttl3d.to_html`, `write` and `show`.
 
 Slicing does not skip the parse: rdflib reads about a million triples in 13 seconds and
 2.3 GB (measured on a 200-class, 200,000-instance file), after which a two-hop slice
-builds in under 1.5 second(s) and a schema slice in under 1.5 second(s). The cost of a
+builds in under 1.5 seconds and a schema slice in under 1.5 seconds. The cost of a
 slice follows the triples that survive, not the nodes: one subject with 200,000 literal
 attributes took 4 seconds at hop 0.
 

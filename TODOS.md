@@ -7,7 +7,7 @@
      page; needs authentication, timeouts and a stubbed endpoint in tests. A CONSTRUCT result feeds
      the same `slice.select` as a file does, and is the way to avoid parsing a million triples for a
      forty-node picture. Medium.
-  2. CSV edge lists and property graphs: a column-to-RDF mapping language of its own; last.
+  2. CSV edge lists and property graphs: a column-to-RDF mapping language of its own.
   3. An optional faster parser: use pyoxigraph through oxrdflib when installed (`pip install
      ttl3d[fast]`), falling back to rdflib's parser. The parse is the floor after slicing (about 13 s
      and 2.3 GB per million triples here); gate it on `importlib.util.find_spec("oxrdflib")` in

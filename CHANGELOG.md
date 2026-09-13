@@ -8,7 +8,7 @@ Nothing yet.
 
 Slicing at build time, for graphs too big to draw: `--focus IRI --hops N` keeps a node's
 neighbourhood over link predicates, `--schema` keeps classes and properties without instances, both
-together keep the neighbourhood inside the schema, and ttl3d prints what it kept (`kept 41 of 200
+together keep the neighbourhood inside the schema, and ttl3d prints what it kept (`kept 12 of 41
 nodes (focus :Earth, 2 hops)`). The same keyword arguments exist on `to_html`, `write` and `show`.
 The slice runs on the RDF before the node/link model, keeps blank-node structure whole, brings each
 kept node's classes along under `--type-links`, and leaves cards, legend and named-graph ownership to
