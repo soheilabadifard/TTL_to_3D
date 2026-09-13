@@ -140,7 +140,7 @@ def test_ownership_follows_the_surviving_triples(tmp_path):
     assert cut["groups"] == ["two"]
 
 
-def test_named_graphs_left_empty_leave_the_legend_but_not_the_title(library_trig):
+def test_named_graphs_left_empty_drop_out_of_the_legend_but_not_the_title(library_trig):
     result = slice.select(load.load_files([library_trig]), focus=[ex("Dune")], hops=1)
     assert result.dataset.stems == [":catalogue", "ex:extra"]           # the schema graph `library` is empty
     assert list(result.dataset.named) == [":catalogue", "ex:extra"]

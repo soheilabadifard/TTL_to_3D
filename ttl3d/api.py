@@ -7,8 +7,8 @@
 Options mirror the command line. Errors are raised, never printed.
 
     sources --> load.load --> Dataset --> [slice.select] --> graph.build --> data --> layout --> html
-    (paths, Graphs, Datasets,                                                    (stress: positions + notice,
-     (name, item), {name: item})                                                 force: nothing)
+    (paths, Graphs, Datasets,                                                         (stress: positions +
+     (name, item), {name: item})                                                      notice, force: nothing)
                                      build_page <-- cli.main -- notice -> stderr, summary line, exit code
                                          |
                                          +-- to_html(...) -> str     +-- write(..., out) -> Path
@@ -42,7 +42,7 @@ class Built:
     labels: dict
 
 
-def check_hops(hops) -> None:
+def check_hops(hops: object) -> None:
     """The one place the hop count is validated: a non-negative int, not a bool. The CLI calls it
     before it reads standard input; build_page calls it before it reads any file."""
     if isinstance(hops, bool) or not isinstance(hops, int) or hops < 0:
@@ -87,7 +87,7 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
                             attribute_preds=extra)
         ds = cut.dataset
     data = graph.build(ds, color_by=color_by, lang=lang, type_links=type_links, attribute_preds=extra)
-    if cut and notice:
+    if cut is not None and notice:
         notice(_slice.describe(len(data["nodes"]), cut.total, seeds, hops, schema, ds.prefixes))
     mode = _layout.choose_layout(len(data["nodes"]), layout)
     if mode == "stress":

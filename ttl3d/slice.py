@@ -19,7 +19,7 @@ model code.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from rdflib import BNode, Graph, URIRef
@@ -53,7 +53,7 @@ def universe(g: Graph, rules: Rules) -> set:
     return nodes
 
 
-def schema_terms(g: Graph, rules: Rules, nodes: set) -> set:
+def schema_terms(g: Graph, nodes: set) -> set:
     """Classes and properties among `nodes`: typed as one, used as an rdf:type object, or an end of
     a hierarchy, domain/range, equivalence, inverse or disjointness triple."""
     terms = set()
@@ -101,8 +101,8 @@ def _copy(source: Graph, kept: set, rules: Rules) -> Graph:
         seen.add(s)
         for triple in source.triples((s, None, None)):
             _, p, o = triple
-            if isinstance(s, BNode) or not isinstance(o, URIRef) or o in kept or p in rules.attribute \
-                    or str(o).startswith(RESERVED):
+            if (isinstance(s, BNode) or not isinstance(o, URIRef) or o in kept or p in rules.attribute
+                    or str(o).startswith(RESERVED)):
                 part.add(triple)
                 if isinstance(o, BNode):
                     pending.append(o)
@@ -121,8 +121,8 @@ def select(ds: Dataset, *, focus: Iterable[URIRef] = (), hops: int = 1, schema: 
     missing = [str(f) for f in seeds if f not in nodes]
     if missing:
         raise ValueError("; ".join(f"focus <{m}> is not a node in the data" for m in missing))
-    within = schema_terms(g, rules, nodes) if schema else nodes
-    kept = neighbourhood(g, rules, seeds, hops, within) if seeds else within
+    within = schema_terms(g, nodes) if schema else nodes
+    kept = neighbourhood(g, rules, seeds, hops, within) if seeds else set(within)
     if type_links:                                   # A9: a kept node keeps its classes, and so do they
         fresh = set(kept)
         while fresh:
@@ -143,9 +143,11 @@ def select(ds: Dataset, *, focus: Iterable[URIRef] = (), hops: int = 1, schema: 
     return Sliced(Dataset(ds.files, graphs, merged, ds.prefixes, ds.sources, named), len(nodes))
 
 
-def describe(kept: int, total: int, focus: Iterable[URIRef], hops: int, schema: bool, prefixes) -> str:
+def describe(kept: int, total: int, focus: Iterable[URIRef], hops: int, schema: bool,
+             prefixes: Mapping[str, str]) -> str:
     """The stderr notice, e.g. `kept 3 of 12 nodes (focus ex:Dune, 1 hop)`; focus IRIs are shortened
-    like legend keys and listed in the order given."""
+    like legend keys and listed in the order given. The caller passes at least one of focus or
+    schema; with neither the text would end in an empty parenthesis."""
     parts = ["schema only"] if schema else []
     seeds = list(focus)
     if seeds:

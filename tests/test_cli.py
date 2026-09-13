@@ -292,6 +292,13 @@ def test_focus_and_schema_slice_the_page_and_announce_it(tmp_path, library, libr
     assert '"groups": ["library"]' in out.read_text(encoding="utf-8")
 
 
+def test_an_empty_focus_is_an_error(tmp_path, library, capsys):
+    out = tmp_path / "s.html"
+    assert cli.main([str(library), "--focus", ",", "-o", str(out)]) == 1
+    assert capsys.readouterr().err == "ttl3d: error: --focus is empty\n"
+    assert not out.exists()
+
+
 def test_hops_needs_focus_and_bad_focus_or_hops_are_one_line_errors(tmp_path, library, capsys):
     out = tmp_path / "s.html"
     assert cli.main([str(library), "--hops", "2", "-o", str(out)]) == 1
@@ -312,15 +319,15 @@ def test_a_bad_hop_count_is_refused_before_standard_input_is_read(tmp_path):
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO)
     try:
         code = proc.wait(timeout=30)
+        err = proc.stderr.read()
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
         pytest.fail("the CLI read standard input before checking --hops")
     finally:
         proc.stdin.close()
-    err = proc.stderr.read()
-    proc.stdout.close()
-    proc.stderr.close()
+        proc.stdout.close()
+        proc.stderr.close()
     assert code == 1 and err.startswith("ttl3d: error: hops must be a non-negative integer")
 
 

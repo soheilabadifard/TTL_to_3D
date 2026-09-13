@@ -50,8 +50,7 @@ class Rules:
 
     @classmethod
     def of(cls, g, type_links: bool = False, attribute_preds=()) -> Rules:
-        attribute = (set(ATTRIBUTE_PREDS) | set(attribute_preds)) - ({RDF.type} if type_links
-                                                                       else set())
+        attribute = (set(ATTRIBUTE_PREDS) | set(attribute_preds)) - ({RDF.type} if type_links else set())
         return cls(frozenset(g.subjects(RDF.type, OWL.Ontology)), frozenset(attribute))
 
     def eligible(self, t) -> bool:

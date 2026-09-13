@@ -75,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"output {out} is also an input file; pick another -o path")
     if args.hops is not None and not args.focus:
         return _fail("--hops needs --focus")
+    focus = [t for arg in args.focus for t in arg.split(",") if t]
+    if args.focus and not focus:
+        return _fail("--focus is empty")
     hops = 1 if args.hops is None else args.hops
     try:
         api.check_hops(hops)
@@ -89,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
             view=args.view, lang=args.lang, type_links=args.type_links,
             attribute_preds=[t for arg in args.attribute_preds for t in arg.split(",") if t],
             fmt=args.format,
-            focus=[t for arg in args.focus for t in arg.split(",") if t] or None, hops=hops,
+            focus=focus or None, hops=hops,
             schema=args.schema, notice=lambda message: print(message, file=sys.stderr))
     except (OSError, ValueError) as e:      # LoadError is a ValueError; an unknown prefix too
         return _fail(e)
