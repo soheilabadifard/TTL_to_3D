@@ -1,0 +1,18 @@
+# The eight planets and their moons from Wikidata, as a small graph for ttl3d:
+#   ttl3d --endpoint https://query.wikidata.org/sparql --query @examples/wikidata-moons.rq -o moons.html
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX solar: <https://example.org/solar#>
+CONSTRUCT {
+  ?planet a solar:Planet ; rdfs:label ?planetLabel ; solar:hasMoon ?moon .
+  ?moon a solar:Moon ; rdfs:label ?moonLabel .
+}
+WHERE {
+  VALUES ?planet { wd:Q308 wd:Q313 wd:Q2 wd:Q111 wd:Q319 wd:Q193 wd:Q324 wd:Q332 }
+  ?planet rdfs:label ?planetLabel . FILTER (lang(?planetLabel) = "en")
+  OPTIONAL {
+    ?moon wdt:P397 ?planet ; wdt:P31/wdt:P279* wd:Q2537 ; rdfs:label ?moonLabel .
+    FILTER (lang(?moonLabel) = "en")
+  }
+}
