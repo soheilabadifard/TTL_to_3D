@@ -16,11 +16,14 @@ identifiers:
 repository-code: "https://github.com/soheilabadifard/TTL_to_3D"
 url: "https://soheilabadifard.github.io/TTL_to_3D/"
 abstract: >-
-  ttl3d turns one or more RDF files (Turtle, N-Triples, RDF/XML, JSON-LD) into a
-  single self-contained HTML page that shows the graph in 3D or 2D, with labels,
-  a legend by file, type or namespace, label search and a detail card for every
-  node. The page embeds all of its JavaScript, so it opens from a file and works
-  offline.
+  ttl3d turns RDF into a single self-contained HTML page that shows the graph in
+  3D or 2D, with labels, a legend by file, type or namespace, label search and a
+  detail card for every node. It reads Turtle, N-Triples, RDF/XML, JSON-LD, TriG
+  and N-Quads, several files at once with each named graph as a legend row of its
+  own, or a CONSTRUCT query against a SPARQL endpoint, and it can cut a large
+  graph down to a neighbourhood or to its schema before drawing it. A Python API
+  shows the same page inline in Jupyter. The page embeds all of its JavaScript,
+  so it opens from a file and works offline.
 keywords:
   - RDF
   - Turtle
@@ -29,4 +32,5 @@ keywords:
   - knowledge graph
   - semantic web
   - linked data
+  - SPARQL
   - graph visualization
