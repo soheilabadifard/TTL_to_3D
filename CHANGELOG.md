@@ -20,7 +20,9 @@ timeouts (`--timeout`, 60 s per network step), answers over `--max-mb` (100 MB) 
 off midway. `load.load` gained a `notice` callback, and the CLI prints `fetched N triples from HOST in S
 s`. Files become optional on the command line. Runs without a query are byte-identical to 0.6.0.
 Example: `examples/wikidata-moons.rq` draws the planets and their moons (916 triples, 308 nodes) from
-Wikidata in about a second.
+Wikidata in about a second. The fetch line says when credentials went out, and when over plain http; a
+token must be printable ASCII without spaces (a trailing line break in a variable is dropped); a query
+file may start with a byte-order mark.
 
 ## 0.6.0 (2026-09-12)
 

@@ -2,7 +2,8 @@
 
 ## Open
 
-- **Inputs after the Python API** (ranked 2026-09-11; each is its own spec and plan):
+- **Inputs after the Python API** (ranked 2026-09-11, items 4 and 5 added 2026-09-14; each is its own
+  spec and plan):
   1. CSV edge lists and property graphs: a column-to-RDF mapping language of its own.
   2. An optional faster parser: use pyoxigraph through oxrdflib when installed (`pip install
      ttl3d[fast]`), falling back to rdflib's parser. The parse is the floor after slicing (about 13 s
