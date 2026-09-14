@@ -509,3 +509,12 @@ def test_a_query_page_is_identical_across_processes(tmp_path, endpoint):
         assert r.returncode == 0, r.stderr
         pages.append(out.read_bytes())
     assert pages[0] == pages[1]
+
+
+def test_format_applies_to_files_but_never_to_a_query_answer(tmp_path, endpoint, tiny_nt, capsys):
+    # the stub answers Turtle, which would fail to parse as N-Triples: --format must reach the file only
+    out = tmp_path / "f.html"
+    argv = [str(tiny_nt), "--format", "nt", "--endpoint", endpoint.url + "/sparql", "--query", Q,
+            "-o", str(out)]
+    assert cli.main(argv) == 0, capsys.readouterr().err
+    assert '"groups": ["127.0.0.1", "tiny"]' in out.read_text(encoding="utf-8")
