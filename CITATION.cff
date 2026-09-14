@@ -13,9 +13,6 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.22716060
     description: The concept DOI, resolving to the latest release on Zenodo
-  - type: doi
-    value: 10.5281/zenodo.22716061
-    description: The DOI of version 0.2.3
 repository-code: "https://github.com/soheilabadifard/TTL_to_3D"
 url: "https://soheilabadifard.github.io/TTL_to_3D/"
 abstract: >-
