@@ -7,7 +7,7 @@
 Options mirror the command line. Errors are raised, never printed.
 
     sources --> load.load --> Dataset --> [slice.select] --> graph.build --> data --> layout --> html
-    (paths, Graphs, Datasets,                                                         (stress: positions +
+    (paths, Graphs, Datasets, Queries,                                                (stress: positions +
      (name, item), {name: item})                                                      notice, force: nothing)
                                      build_page <-- cli.main -- notice -> stderr, summary line, exit code
                                          |
@@ -61,8 +61,9 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
                attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
                focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
                notice: Callable[[str], None] | None = None) -> Built:
-    """Run every stage once. `notice` receives the stress-layout announcement, if any (the CLI
-    prints it to stderr; the API stays silent). Option values are checked before any work.
+    """Run every stage once. `notice` receives the fetch line of every sparql.Query source,
+    the slice line and the stress-layout announcement, if any (the CLI prints them to stderr; the
+    API stays silent). Option values are checked before any work.
     `focus`, `hops` and `schema` cut the data down before the model is built (see ttl3d.slice);
     `hops` is checked before any file is read, a focus that is not a node in the data raises
     after loading."""
@@ -75,7 +76,7 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
     if color_by not in graph.COLOR_KEYS:
         raise ValueError(f"color_by must be one of {graph.COLOR_KEYS}, got {color_by!r}")
     check_hops(hops)
-    ds = load.load(sources, fmt)
+    ds = load.load(sources, fmt, notice=notice)
     if not ds.sources:
         raise ValueError("at least one source is needed")
     extra = _terms(attribute_preds, ds)
