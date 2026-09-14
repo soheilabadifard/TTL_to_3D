@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="how long to wait for each network step of the endpoint's answer (default: 60)")
     p.add_argument("--max-mb", type=float, default=sparql.MAX_BYTES / 1e6, metavar="MB",
                    help="largest answer to accept, in megabytes (default: 100); the parse needs about 35 "
-                        "times that in memory")
+                        "times an N-Triples answer's size in memory, and more for Turtle")
     p.add_argument("--format", metavar="NAME",
                    help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
                         "default: guess from the extension, then try turtle")
@@ -78,7 +78,20 @@ def _query_name(text: str, endpoint: str) -> str:
 
 
 def _query_text(text: str) -> str:
-    return Path(text[1:]).read_text(encoding="utf-8") if text.startswith("@") else text
+    if not text.startswith("@"):
+        return text
+    path = Path(text[1:])
+    try:
+        return path.read_text(encoding="utf-8-sig")   # a leading byte-order mark is dropped, not sent
+    except UnicodeDecodeError:
+        raise ValueError(f"{path}: the query file is not UTF-8 text") from None
+
+
+def _secret(name: str) -> str | None:
+    """An environment variable with a trailing line break stripped: a secrets file or pasted value
+    often ends with one. Spaces are kept; a token or password might genuinely have them."""
+    value = os.environ.get(name)
+    return value.rstrip("\r\n") if value is not None else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,12 +107,16 @@ def main(argv: list[str] | None = None) -> int:
         return _fail("--endpoint needs --query")
     if not args.files and not args.query:
         return _fail("at least one file or --query is needed")
-    max_bytes = int(args.max_mb * 1_000_000) if math.isfinite(args.max_mb) else 0
-    if max_bytes < 1:
-        return _fail("--max-mb must be a positive number of megabytes")
-    user, token = os.environ.get("TTL3D_SPARQL_USER"), os.environ.get("TTL3D_SPARQL_TOKEN")
-    if user and token:
-        return _fail("set either TTL3D_SPARQL_TOKEN or TTL3D_SPARQL_USER, not both")
+    if args.query:
+        max_bytes = int(args.max_mb * 1_000_000) if math.isfinite(args.max_mb) else 0
+        if max_bytes < 1:
+            return _fail("--max-mb must be a positive number of megabytes")
+        user, token = _secret("TTL3D_SPARQL_USER"), _secret("TTL3D_SPARQL_TOKEN")
+        if user and token:
+            return _fail("set either TTL3D_SPARQL_TOKEN or TTL3D_SPARQL_USER, not both")
+    else:                                         # a query-free run never looks at these at all
+        max_bytes = sparql.MAX_BYTES
+        user = token = None
     if args.files.count("-") > 1:
         return _fail("standard input can be given only once")
     # files first, then queries: the first source names the page and the default output
@@ -118,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     hops = 1 if args.hops is None else args.hops
     try:
         api.check_hops(hops)
-        auth = (user, os.environ.get("TTL3D_SPARQL_PASSWORD", "")) if user else None
+        auth = (user, _secret("TTL3D_SPARQL_PASSWORD") or "") if user else None
         # every Query is built, and so checked, before standard input is read or anything is sent
         queries = [(name, sparql.Query(args.endpoint, _query_text(q), auth=auth, token=token or None,
                                        timeout=args.timeout, max_bytes=max_bytes))

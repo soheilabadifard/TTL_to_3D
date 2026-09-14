@@ -111,9 +111,10 @@ def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file
             labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
             attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
             focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False) -> str:
-    """The page as HTML text. `sources`: a path, an rdflib.Graph or rdflib.Dataset, a (name, item)
-    pair, or a list of those; a path is named by its stem, a Graph by its pair name or "graph", a
-    Dataset by its pair name or "dataset". A quad file or a Dataset adds one source per named graph.
+    """The page as HTML text. `sources`: a path, an rdflib.Graph, an rdflib.Dataset or a ttl3d.Query,
+    a (name, item) pair, or a list of those; a path is named by its stem, a Graph by its pair name or
+    "graph", a Dataset by its pair name or "dataset". A quad file or a Dataset adds one source per
+    named graph.
     `title=None` means the first source's name; an empty string is an empty title (unlike
     `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")

@@ -427,3 +427,10 @@ def test_an_empty_answer_is_a_source_with_nothing_in_it(endpoint):
 def test_a_query_counts_as_a_source_in_the_type_error_message():
     with pytest.raises(TypeError, match="a sparql.Query"):
         load.load(42)
+
+
+def test_the_notice_names_the_credentials_sent_and_never_the_token(endpoint):
+    seen = []
+    load.load(sparql.Query(endpoint.url + "/auth", Q, token="tok123"), notice=seen.append)
+    assert seen[0].endswith(" s with a Bearer token over plain http")
+    assert "tok123" not in seen[0]

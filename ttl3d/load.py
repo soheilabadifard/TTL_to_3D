@@ -205,7 +205,7 @@ def _items(sources) -> list:
 def _named(item) -> tuple:
     if isinstance(item, tuple):
         if len(item) != 2 or not isinstance(item[0], str):
-            raise TypeError(f"a named source is a (name, path-or-Graph) pair, got {item!r}")
+            raise TypeError(f"a named source is a (name, path, Graph or Query) pair, got {item!r}")
         return item
     return None, item
 
@@ -241,7 +241,7 @@ def load(sources: Sources, fmt: str | None = None, *,
             rds = parse_data(body, media or "text/turtle", key, base=obj.endpoint)
             if notice:
                 notice(f"fetched {len(rds)} triples from {sparql.host(obj.endpoint)} "
-                       f"in {time.perf_counter() - started:.1f} s")
+                       f"in {time.perf_counter() - started:.1f} s{sparql.sent_with(obj)}")
             for prefix, ns in sparql.prefixes_in(obj.query).items():   # the author's names first
                 prefixes.setdefault(ns, prefix)
             bound = rds

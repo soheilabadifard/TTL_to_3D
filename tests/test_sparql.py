@@ -53,9 +53,13 @@ def test_host_is_the_hostname_without_user_info_or_the_endpoint_itself():
 
 @pytest.mark.parametrize(("change", "message"), [
     ({"endpoint": "file:///etc/hosts"}, "the endpoint must be an http:// or https:// URL with a host name"),
-    ({"endpoint": "https://bob:pw@h.org/sparql"}, "the endpoint URL must not carry credentials"),
+    ({"endpoint": "https://bob:s3cret@h.org/sparql"}, "the endpoint URL must not carry credentials"),
+    ({"endpoint": "https://h.org/spar ql"}, "must not contain spaces or line breaks"),
+    ({"endpoint": "https://h.org:abc/sparql"}, "invalid port"),
     ({"auth": "bob:pw"}, "auth is a"),
     ({"auth": ("bob", "pw"), "token": "tok"}, "give either auth or token, not both"),
+    ({"token": "tok123\n"}, "the token must be a non-empty string of printable ASCII"),
+    ({"token": ""}, "the token must be a non-empty string of printable ASCII"),
     ({"timeout": 0}, "timeout must be a positive number of seconds"),
     ({"timeout": float("inf")}, "timeout must be a positive number of seconds"),
     ({"max_bytes": 0}, "max_bytes must be a positive whole number of bytes"),
@@ -64,7 +68,7 @@ def test_host_is_the_hostname_without_user_info_or_the_endpoint_itself():
 def test_an_invalid_query_cannot_be_built(change, message):
     with pytest.raises(ValueError, match=message) as e:
         sparql.Query(**{"endpoint": "https://h.org/sparql", "query": CONSTRUCT, **change})
-    assert "pw" not in str(e.value) or "PASSWORD" in str(e.value)       # the URL's password is never echoed
+    assert "s3cret" not in str(e.value) and "tok123" not in str(e.value)   # never echoed
 
 
 def test_fetch_posts_the_form_body_with_the_accept_and_user_agent_headers(endpoint):
@@ -138,11 +142,12 @@ def test_an_unreachable_endpoint_is_a_clean_error():
         sparql.fetch(sparql.Query("http://127.0.0.1:9/sparql", CONSTRUCT, timeout=5))
 
 
-def test_a_redirect_is_refused_and_names_the_new_url_without_its_secrets(endpoint):
+@pytest.mark.parametrize("path", ["/moved", "/moved307"])
+def test_a_redirect_is_refused_and_names_the_new_url_without_its_secrets(endpoint, path):
     with pytest.raises(sparql.FetchError) as e:
-        sparql.fetch(sparql.Query(endpoint.url + "/moved", CONSTRUCT, auth=("bob", "s3cret")))
-    assert str(e.value) == f"endpoint 127.0.0.1/moved redirects to {endpoint.url}/sparql: use that URL"
-    assert [path for path, _, _ in endpoint.requests] == ["/moved"]     # the credentials never followed it
+        sparql.fetch(sparql.Query(endpoint.url + path, CONSTRUCT, auth=("bob", "s3cret")))
+    assert str(e.value) == f"endpoint 127.0.0.1{path} redirects to {endpoint.url}/sparql: use that URL"
+    assert [p for p, _, _ in endpoint.requests] == [path]     # the credentials never followed it
 
 
 def test_an_answer_over_the_limit_is_refused(endpoint):
@@ -156,3 +161,41 @@ def test_an_answer_over_the_limit_is_refused(endpoint):
 def test_an_answer_cut_short_is_an_error_not_a_smaller_graph(endpoint):
     with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/cut broke off the answer"):
         sparql.fetch(sparql.Query(endpoint.url + "/cut", CONSTRUCT))
+
+
+def test_a_connection_that_closes_mid_chunk_stream_is_an_error(endpoint):
+    with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/chunkcut broke off the answer"):
+        sparql.fetch(sparql.Query(endpoint.url + "/chunkcut", CONSTRUCT))
+
+
+def test_a_request_urllib_refuses_never_echoes_the_token():
+    # past __post_init__'s own checks, to prove fetch's backstop against whatever urllib itself refuses
+    q = sparql.Query("http://127.0.0.1:9/sparql", CONSTRUCT, token="tok123")
+    object.__setattr__(q, "token", "tok123\n")
+    with pytest.raises(sparql.FetchError) as e:
+        sparql.fetch(q)
+    assert str(e.value) == "cannot send the request to 127.0.0.1/sparql"
+    assert "tok123" not in repr(e.value)
+    assert e.value.__cause__ is None
+
+
+def test_a_byte_order_mark_before_the_query_is_skipped_like_whitespace():
+    with pytest.raises(ValueError, match="not SELECT"):
+        sparql.form("﻿SELECT * WHERE {}")
+    assert sparql.prefixes_in("﻿PREFIX a: <http://a/> CONSTRUCT {} WHERE {}") == {"a": "http://a/"}
+
+
+def test_sent_with_names_the_credentials_and_warns_over_plain_http():
+    none = sparql.Query("https://h.org/sparql", CONSTRUCT)
+    bearer_https = sparql.Query("https://h.org/sparql", CONSTRUCT, token="tok123")
+    basic_http = sparql.Query("http://h.org/sparql", CONSTRUCT, auth=("bob", "s3cret"))
+    assert sparql.sent_with(none) == ""
+    assert sparql.sent_with(bearer_https) == " with a Bearer token"
+    assert sparql.sent_with(basic_http) == " with Basic credentials over plain http"
+
+
+def test_a_secret_containing_spaces_is_scrubbed_before_whitespace_collapses_it(endpoint):
+    with pytest.raises(sparql.FetchError) as e:
+        sparql.fetch(sparql.Query(endpoint.url + "/echo", CONSTRUCT, auth=("bob", "pa  ss")))
+    message = str(e.value)
+    assert "pa  ss" not in message and "pa ss" not in message

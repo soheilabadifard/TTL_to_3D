@@ -518,3 +518,40 @@ def test_format_applies_to_files_but_never_to_a_query_answer(tmp_path, endpoint,
             "-o", str(out)]
     assert cli.main(argv) == 0, capsys.readouterr().err
     assert '"groups": ["127.0.0.1", "tiny"]' in out.read_text(encoding="utf-8")
+
+
+def test_a_query_free_run_never_looks_at_max_mb_or_the_credential_variables(tmp_path, library, monkeypatch):
+    monkeypatch.setenv("TTL3D_SPARQL_USER", "bob")
+    monkeypatch.setenv("TTL3D_SPARQL_TOKEN", "tok")
+    out = tmp_path / "o.html"
+    assert cli.main([str(library), "--max-mb", "0", "-o", str(out)]) == 0
+
+
+def test_a_trailing_line_break_in_the_token_variable_is_stripped_and_never_printed(tmp_path, endpoint,
+                                                                                    monkeypatch, capsys):
+    monkeypatch.setenv("TTL3D_SPARQL_TOKEN", "tok123\r\n")
+    out = tmp_path / "o.html"
+    assert cli.main(["--endpoint", endpoint.url + "/auth", "--query", Q, "-o", str(out)]) == 0
+    assert endpoint.requests[0][1]["Authorization"] == "Bearer tok123"
+    err = capsys.readouterr().err
+    assert "tok123" not in err
+    assert err.strip().endswith("with a Bearer token over plain http")
+
+
+def test_a_query_file_starting_with_a_byte_order_mark_is_read_correctly(tmp_path, endpoint, capsys):
+    rq = tmp_path / "bom.rq"
+    rq.write_bytes("﻿SELECT * WHERE {}".encode())
+    out = tmp_path / "o.html"
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", f"@{rq}", "-o", str(out)]) == 1
+    assert capsys.readouterr().err == "ttl3d: error: the query must be CONSTRUCT or DESCRIBE, not SELECT\n"
+    assert endpoint.requests == []
+
+
+def test_a_query_file_that_is_not_utf8_text_is_a_one_line_error(tmp_path, endpoint, capsys):
+    rq = tmp_path / "bad.rq"
+    rq.write_bytes(b"\xff\xfeCONSTRUCT {} WHERE {}")
+    out = tmp_path / "o.html"
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", f"@{rq}", "-o", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and str(rq) in err and "not UTF-8 text" in err
+    assert endpoint.requests == []

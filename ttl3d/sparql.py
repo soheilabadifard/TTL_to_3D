@@ -31,10 +31,11 @@ MAX_BYTES = 100_000_000                  # 100 MB of answer; the parse needs abo
 NOT_A_GRAPH = frozenset({                # query forms and updates whose answer is not an RDF graph
     "SELECT", "ASK", "INSERT", "DELETE", "LOAD", "CLEAR", "CREATE", "DROP", "COPY", "MOVE", "ADD", "WITH",
 })
-_GAP = re.compile(r"(?:\s+|#[^\n]*)+")                           # whitespace and comments between tokens
+_GAP = re.compile(r"(?:[\s﻿]+|#[^\n]*)+")     # whitespace, a byte-order mark and comments
 _BASE = re.compile(r"BASE\s*<([^>]*)>", re.IGNORECASE)
 _PREFIX = re.compile(r"PREFIX\s+([^\W\d_][\w.-]*)?:\s*<([^>]*)>", re.IGNORECASE)
 _WORD = re.compile(r"[A-Za-z]+")
+_TOKEN = re.compile(r"[\x21-\x7e]+")                             # printable ASCII, no spaces or controls
 
 
 class FetchError(ValueError):
@@ -42,8 +43,7 @@ class FetchError(ValueError):
 
 
 def check_timeout(timeout) -> None:
-    """A timeout is a positive, finite number of seconds (socket.settimeout overflows on inf); the CLI
-    and Query share this check."""
+    """A timeout is a positive, finite number of seconds (socket.settimeout overflows on inf)."""
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not (
             timeout > 0 and math.isfinite(timeout)):
         raise ValueError(f"timeout must be a positive number of seconds, got {timeout!r}")
@@ -121,7 +121,14 @@ class Query:
     max_bytes: int = MAX_BYTES
 
     def __post_init__(self):
+        if any(c.isspace() for c in self.endpoint):
+            # checked before urlsplit, which would otherwise silently strip tabs and newlines
+            raise ValueError("the endpoint URL must not contain spaces or line breaks")
         parts = urllib.parse.urlsplit(self.endpoint)
+        try:
+            _ = parts.port
+        except ValueError:
+            raise ValueError("the endpoint URL has an invalid port") from None
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise ValueError("the endpoint must be an http:// or https:// URL with a host name")
         if parts.username is not None or parts.password is not None:
@@ -130,6 +137,8 @@ class Query:
         if self.auth is not None and not (isinstance(self.auth, tuple) and len(self.auth) == 2
                                           and all(isinstance(part, str) for part in self.auth)):
             raise ValueError("auth is a (user, password) pair of strings")
+        if self.token is not None and not (isinstance(self.token, str) and _TOKEN.fullmatch(self.token)):
+            raise ValueError("the token must be a non-empty string of printable ASCII without spaces")
         if self.auth is not None and self.token is not None:
             raise ValueError("give either auth or token, not both")
         check_timeout(self.timeout)
@@ -148,6 +157,20 @@ def _scrub(text: str, q: Query) -> str:
     for secret in sorted(filter(None, secrets), key=len, reverse=True):
         text = text.replace(secret, "***")
     return text
+
+
+def sent_with(q: Query) -> str:
+    """What `fetch` sends, for the notice: "" for no credentials, " with a Bearer token" or " with
+    Basic credentials" otherwise, plus " over plain http" when credentials go out unencrypted."""
+    if q.token:
+        which = " with a Bearer token"
+    elif q.auth:
+        which = " with Basic credentials"
+    else:
+        return ""
+    if urllib.parse.urlsplit(q.endpoint).scheme == "http":
+        which += " over plain http"
+    return which
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -186,9 +209,12 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
             media = resp.headers.get_content_type() if resp.headers.get("Content-Type") else None
             short = resp.length                       # bytes promised by Content-Length but never sent
     except urllib.error.HTTPError as e:
-        first = " ".join(e.read(4096).decode("utf-8", "replace").split("\n", 1)[0].split())
+        raw = e.read(4096)
         e.close()
-        first = _scrub(first, q)[:200]
+        # scrub before collapsing whitespace: a secret containing a run of spaces (or split across
+        # the truncated first line) must still match exactly, which whitespace-collapsing would break
+        scrubbed = _scrub(raw.decode("utf-8", "replace"), q)
+        first = " ".join(scrubbed.split("\n", 1)[0].split())[:200]
         raise FetchError(f"endpoint {where} answered {e.code}" + (f": {first}" if first else "")) from e
     except TimeoutError as e:
         raise FetchError(f"endpoint {where} did not answer within {q.timeout:g} s") from e
@@ -198,6 +224,12 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
         raise FetchError(f"cannot reach {where}: {e.reason}") from e
     except (OSError, http.client.HTTPException) as e:       # a connection that broke off mid-answer
         raise FetchError(f"endpoint {where} broke off the answer: {e}") from e
+    except ValueError as e:
+        if isinstance(e, FetchError):        # the redirect refusal: a FetchError, pass it through as is
+            raise
+        # http.client can raise ValueError with the header value in its message (e.g. a token or
+        # password containing a stray newline): never let that reach the caller
+        raise FetchError(f"cannot send the request to {where}") from None
     if len(body) > q.max_bytes:
         raise FetchError(f"endpoint {where} answered more than {q.max_bytes / 1e6:g} MB; "
                          "narrow the query or raise the limit (--max-mb, Query.max_bytes)")
