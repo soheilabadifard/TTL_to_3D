@@ -197,11 +197,13 @@ import ttl3d
 query = open("examples/wikidata-moons.rq", encoding="utf-8").read()
 moons = ttl3d.Query("https://query.wikidata.org/sparql", query)
 ttl3d.write(("moons", moons), "moons.html", color_by="type")
-ttl3d.show([("moons", moons), "solar-system.ttl"], focus=[":Earth"], hops=2)   # a query and a file, sliced
+ttl3d.show(["examples/solar-system.ttl", ("moons", moons)], focus=["wd:Q2"], hops=1)   # Earth and its moons, sliced
 ```
 
-The answer parses like a file (about 13 s and 2.3 GB per million triples), so let the query select the
-piece: a `VALUES` list or a `LIMIT` keeps an answer small, and `--focus`/`--schema` trim further.
+A namespace is named by the first source that binds it, so list a file first when you focus with its
+prefixes. The answer parses like a file (about 13 s and 2.3 GB per million triples), so let the query
+select the piece: a `VALUES` list or a `LIMIT` keeps an answer small, and `--focus`/`--schema` trim
+further.
 
 ## In the page
 
