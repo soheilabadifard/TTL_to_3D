@@ -5,6 +5,7 @@ TriX, JSON-LD with named @graph blocks) is a source of its own, keyed by its pre
     path / bytes --rdflib Dataset.parse--> rdflib Dataset --_split--> default graph (+ blank-node graphs)
     rdflib.Dataset ---------------------------------------_split--> named graphs {IRI: Graph}
     rdflib.Graph -------------------------------------------------> used as is, no named graphs
+    sparql.Query --sparql.fetch--> bytes --parse, base = endpoint--> one key (named graphs folded in)
          |                                    one (name, default, named) part per source, in input order
          v
     prefixes: namespace -> prefix from every source, first binding wins   (collected before any key)
@@ -23,8 +24,9 @@ TriX, JSON-LD with named @graph blocks) is a source of its own, keyed by its pre
 from __future__ import annotations
 
 import os
+import time
 import warnings
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,6 +34,8 @@ from rdflib import Dataset as RdfDataset
 from rdflib import Graph, URIRef
 from rdflib.graph import DATASET_DEFAULT_GRAPH_ID
 from rdflib.util import guess_format
+
+from . import sparql
 
 
 class LoadError(ValueError):
@@ -122,12 +126,13 @@ def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
         raise
 
 
-def parse_data(data: bytes, fmt: str | None = None, name: str = "data") -> RdfDataset:
-    """Parse in-memory bytes (the CLI's standard input) as `fmt`, Turtle by default: there is no
-    extension to guess from and no retry. A failure is a LoadError naming `name`. Relative IRIs
-    resolve against the working directory, as rdflib does for data without a base; declare @base
-    in the data to be explicit."""
-    return _parsed(name, fmt or "turtle", lambda rds, fm: rds.parse(data=data, format=fm))
+def parse_data(data: bytes, fmt: str | None = None, name: str = "data",
+               base: str | None = None) -> RdfDataset:
+    """Parse in-memory bytes (standard input, a SPARQL answer) as `fmt`, Turtle by default: there is
+    no extension to guess from and no retry. A failure is a LoadError naming `name`. Relative IRIs
+    resolve against `base` (a SPARQL answer passes its endpoint), else against the working
+    directory, as rdflib does for data without a base; declare @base in the data to be explicit."""
+    return _parsed(name, fmt or "turtle", lambda rds, fm: rds.parse(data=data, format=fm, publicID=base))
 
 
 def _contexts(rds: RdfDataset):
@@ -175,21 +180,21 @@ def curie(iri: URIRef, prefixes: Mapping[str, str]) -> str:
 
 
 # one source; a tuple is always a (name, item) pair, never two sources
-Source = str | os.PathLike | Graph | tuple[str, str | os.PathLike | Graph]
+Source = str | os.PathLike | Graph | sparql.Query | tuple[str, str | os.PathLike | Graph | sparql.Query]
 
 _NOT_A_SOURCE = (
-    "a source is a path, an rdflib.Graph, a (name, source) pair or a "
+    "a source is a path, an rdflib.Graph, a sparql.Query, a (name, source) pair or a "
     "mapping of names to those, not {}"
 )
 
 
 def _items(sources) -> list:
-    """One source or an iterable of sources, as a list. A str, a path, a Graph or a tuple is one
+    """One source or an iterable of sources, as a list. A str, a path, a Graph, a Query or a tuple is one
     source: a tuple is always a (name, item) pair, never two sources; several go in a list. A
     mapping names its values: {"planets": g} is the same as [("planets", g)]."""
     if isinstance(sources, Mapping):
         return list(sources.items())
-    if isinstance(sources, (str, os.PathLike, Graph, tuple)):
+    if isinstance(sources, (str, os.PathLike, Graph, tuple, sparql.Query)):
         return [sources]
     try:
         return list(sources)
@@ -200,16 +205,17 @@ def _items(sources) -> list:
 def _named(item) -> tuple:
     if isinstance(item, tuple):
         if len(item) != 2 or not isinstance(item[0], str):
-            raise TypeError(f"a named source is a (name, path-or-Graph) pair, got {item!r}")
+            raise TypeError(f"a named source is a (name, path, Graph or Query) pair, got {item!r}")
         return item
     return None, item
 
 
 # what load() and the API accept: one source, several, or a mapping of name to source
-Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph]
+Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph | sparql.Query]
 
 
-def load(sources: Sources, fmt: str | None = None) -> Dataset:
+def load(sources: Sources, fmt: str | None = None, *,
+         notice: Callable[[str], None] | None = None) -> Dataset:
     """Parse and merge paths and in-memory graphs, keeping which source said what.
 
     A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph", an
@@ -218,14 +224,33 @@ def load(sources: Sources, fmt: str | None = None) -> Dataset:
     copied. A quad source (a TriG, N-Quads, TriX or JSON-LD file, or an rdflib.Dataset)
     contributes its default graph under the source name and every named graph under its prefixed
     IRI (`ex:planets`); the same graph IRI in several sources is one key, sitting where the graph
-    first appeared. `fmt` forces one parser for every path, as --format does."""
+    first appeared. A sparql.Query is fetched (one POST) and its answer parsed by the response's
+    media type against the endpoint as base, under the endpoint's host unless paired; its named
+    graphs fold into that one key and its PREFIX lines bind before the answer's own; `notice` gets
+    one "fetched N triples from HOST in S s" line per query. `fmt` forces one parser for every
+    path, as --format does."""
     files: list[Path] = []
     names: list[str] = []
     prefixes: dict[str, str] = {}
     parts: list[tuple[str, Graph, dict[URIRef, Graph]]] = []    # (name, default graph, named graphs)
     for item in _items(sources):
         name, obj = _named(item)
-        if isinstance(obj, RdfDataset):                          # before Graph: a Dataset is a Graph
+        if isinstance(obj, sparql.Query):                        # checked when it was built
+            key, started = name or sparql.host(obj.endpoint), time.perf_counter()
+            body, media = sparql.fetch(obj)
+            rds = parse_data(body, media or "text/turtle", key, base=obj.endpoint)
+            if notice:
+                notice(f"fetched {len(rds)} triples from {sparql.host(obj.endpoint)} "
+                       f"in {time.perf_counter() - started:.1f} s{sparql.sent_with(obj)}")
+            for prefix, ns in sparql.prefixes_in(obj.query).items():   # the author's names first
+                prefixes.setdefault(ns, prefix)
+            bound = rds
+            default, named_graphs = _split(rds)
+            for g in named_graphs.values():                      # one legend row per query (spec D4)
+                for triple in g:
+                    default.add(triple)
+            named_graphs = {}
+        elif isinstance(obj, RdfDataset):                          # before Graph: a Dataset is a Graph
             key, bound = name or "dataset", obj
             default, named_graphs = _split(obj)
         elif isinstance(obj, Graph):

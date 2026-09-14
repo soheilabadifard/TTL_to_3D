@@ -64,8 +64,9 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb)
 
 The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`). Sources are file paths,
-`rdflib.Graph` or `rdflib.Dataset` objects, `(name, source)` pairs or a `{name: source}` mapping, in any mix;
-the options are the command line's (`focus`, `hops` and `schema` included).
+`rdflib.Graph` or `rdflib.Dataset` objects, `ttl3d.Query` objects (a CONSTRUCT against a SPARQL
+endpoint), `(name, source)` pairs or a `{name: source}` mapping, in any mix; the options are the
+command line's (`focus`, `hops` and `schema` included).
 
 ```python
 import rdflib, ttl3d
@@ -86,12 +87,12 @@ notebook behind the badge.
 | Option | Values | Meaning |
 |--------|--------|---------|
 | `-` (as a file) | | Read standard input, parsed as `--format` or Turtle; the page and the default output name are called `stdin`. Relative IRIs resolve against the working directory (a file's resolve against its folder); declare `@base` to be explicit. |
-| `-o, --out` | path | Output file. Default: `<first file stem>-<view>.html` in the current directory. |
+| `-o, --out` | path | Output file. Default: `<first source's name>-<view>.html` in the current directory (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text). |
 | `--color-by` | `file` (default), `type`, `namespace` | What node colours and the legend mean. In `file` mode edges also take the colour of the file asserting them. A named graph of a TriG or N-Quads file counts as a file. |
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed Kamada-Kawai position, one layout per view (3D and 2D); `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
 | `--view` | `3d` (default), `2d` | Starting view. The page has a `3D \| 2D` switch either way, and each view is pinned to its own stress layout. |
-| `--title` | text | Page title. Default: the first file's stem. |
+| `--title` | text | Page title. Default: the first source's name (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text). |
 | `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. Matched exactly: `--lang en` does not select `@en-GB`. |
 | `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, `trig`, `nquads`, ...). Default: guess from the extension, then try Turtle. |
 | `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
@@ -99,6 +100,10 @@ notebook behind the badge.
 | `--focus` | `prefix:local`, full IRI, or `<urn:...>` | Keep only this node's neighbourhood (with `--hops`). Repeatable or comma-separated. |
 | `--hops` | integer, default 1 | How many link steps from a focus node to keep; `0` keeps the focus nodes only. Needs `--focus`. |
 | `--schema` | flag | Keep classes and properties only: the schema, without instances. |
+| `--endpoint` | URL | A SPARQL endpoint (http or https) to run every `--query` against. Credentials come from `TTL3D_SPARQL_USER` and `TTL3D_SPARQL_PASSWORD` (HTTP Basic) or `TTL3D_SPARQL_TOKEN` (Bearer), never from the command line; a URL carrying `user:password@` is refused. |
+| `--query` | `CONSTRUCT ...` or `@file.rq` | A CONSTRUCT or DESCRIBE query whose result is a source: a legend row named after the file, or after the endpoint's host for inline text. Repeatable. SELECT, ASK and updates are refused before anything is sent. |
+| `--timeout` | seconds, default 60 | How long to wait for each network step (connect, read) of the endpoint's answer; one attempt, no retry. |
+| `--max-mb` | megabytes, default 100 | The largest answer to accept; a bigger one is refused with a hint to narrow the query. Parsing needs about 35 times an N-Triples answer's size in memory, and more for Turtle. |
 | `--version` | flag | Print `ttl3d <version>` and exit. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
@@ -164,6 +169,45 @@ builds in under 1.5 seconds and a schema slice in under 1.5 seconds. The cost of
 slice follows the triples that survive, not the nodes: one subject with 200,000 literal
 attributes took 4 seconds at hop 0.
 
+## From a SPARQL endpoint
+
+A triple store is drawn without exporting it: a CONSTRUCT (or DESCRIBE) query is a source like a
+file, fetched at build time with one POST and never from the page.
+
+```bash
+ttl3d --endpoint https://query.wikidata.org/sparql --query @examples/wikidata-moons.rq -o moons.html
+# fetched 916 triples from query.wikidata.org in 0.7 s
+# computing stress layouts (3D and 2D) for 308 nodes...
+# 308 nodes, 300 links -> moons.html (view: 3d, layout: stress, labels: node+edge)
+```
+
+`--query` repeats, each result its own legend row, and files and queries mix in one page. The query's
+`PREFIX` lines name the page's namespaces, so an endpoint that answers in N-Triples still gets short
+names; relative IRIs in an answer resolve against the endpoint. Protected endpoints take
+`TTL3D_SPARQL_USER`/`TTL3D_SPARQL_PASSWORD` or `TTL3D_SPARQL_TOKEN` from the environment, and nothing
+ttl3d prints shows them. ttl3d sends them to whatever endpoint the command names, so set them for one
+command (`TTL3D_SPARQL_TOKEN=... ttl3d ...`) rather than exporting them; the fetch line on stderr says
+when credentials went out, and when they went over plain http. Errors are one line: a query that is not
+CONSTRUCT or DESCRIBE is refused before anything is sent, an HTTP error quotes the endpoint's first
+line, a slow endpoint stops at `--timeout` (60 s per network step by default), a redirect is refused
+with the URL to use, and an answer that is not RDF (Turtle, N-Triples, RDF/XML, N3 or a quad format;
+JSON-LD is refused too), is larger than `--max-mb` (100 MB) or breaks off midway is refused rather than
+drawn in part. In Python the same source is `ttl3d.Query`:
+
+```python
+import ttl3d
+
+query = open("examples/wikidata-moons.rq", encoding="utf-8").read()
+moons = ttl3d.Query("https://query.wikidata.org/sparql", query)
+ttl3d.write(("moons", moons), "moons.html", color_by="type")
+ttl3d.show(["examples/solar-system.ttl", ("moons", moons)], focus=["wd:Q2"], hops=1)   # Earth and its moons, sliced
+```
+
+A namespace is named by the first source that binds it, so list a file first when you focus with its
+prefixes. The answer parses like a file (about 13 s and 2.3 GB per million triples), so let the query
+select the piece: a `VALUES` list or a `LIMIT` keeps an answer small, and `--focus`/`--schema` trim
+further.
+
 ## In the page
 
 - Legend rows filter inclusively: a selected group keeps its own nodes, their
@@ -193,7 +237,8 @@ scene objects, so the automatic modes degrade instead of freezing:
 | up to 1000 nodes | pinned stress layout | tooltips for the layer over its threshold |
 | larger | live force simulation | tooltips; switch sprites on from the panel |
 
-For inputs far beyond these sizes, slice them first: see "Slicing a big graph".
+For inputs far beyond these sizes, slice them first: see "Slicing a big graph". A store behind a
+SPARQL endpoint answers with the piece you ask for: see "From a SPARQL endpoint".
 
 The stress layout is computed twice, once per view, so a pinned page takes about
 twice the layout time of 0.1.0.

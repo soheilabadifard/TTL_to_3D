@@ -4,6 +4,26 @@
 
 Nothing yet.
 
+## 0.7.0 (2026-09-14)
+
+SPARQL endpoints as sources: `--endpoint URL --query TEXT|@FILE` (repeatable) fetches a CONSTRUCT or
+DESCRIBE result with one POST at build time and treats it like a file, with its own legend row named
+after the query file or the endpoint's host; `ttl3d.Query(endpoint, query, auth=, token=, timeout=,
+max_bytes=)` is the same source in Python and checks itself when built. Credentials come from
+`TTL3D_SPARQL_USER`/`TTL3D_SPARQL_PASSWORD` or `TTL3D_SPARQL_TOKEN`, never from the command line; an
+endpoint URL carrying them is refused, `repr` never shows them, and server text quoted in an error has
+them blanked. The query's PREFIX lines name the page's namespaces; the answer is parsed by its media
+type (Turtle, N-Triples, RDF/XML, or a quad format folded into the query's one row) with the endpoint as
+base, and a JSON-LD answer is refused, since its parser would fetch a remote @context. One-line errors
+cover SELECT, ASK and updates (before anything is sent), HTTP errors, redirects (with the URL to use),
+timeouts (`--timeout`, 60 s per network step), answers over `--max-mb` (100 MB) and answers that break
+off midway. `load.load` gained a `notice` callback, and the CLI prints `fetched N triples from HOST in S
+s`. Files become optional on the command line. Runs without a query are byte-identical to 0.6.0.
+Example: `examples/wikidata-moons.rq` draws the planets and their moons (916 triples, 308 nodes) from
+Wikidata in about a second. The fetch line says when credentials went out, and when over plain http; a
+token must be printable ASCII without spaces (a trailing line break in a variable is dropped); a query
+file may start with a byte-order mark.
+
 ## 0.6.0 (2026-09-12)
 
 Slicing at build time, for graphs too big to draw: `--focus IRI --hops N` keeps a node's

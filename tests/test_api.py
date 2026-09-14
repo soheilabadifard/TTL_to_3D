@@ -169,8 +169,8 @@ def test_page_repr_is_short_and_write_writes_the_html(tmp_path, library):
 
 
 def test_the_package_promises_exactly_these_names():
-    expected = ["Page", "Source", "Sources", "__version__", "show", "to_html", "write"]  # ruff RUF022
-    assert ttl3d.__all__ == expected
+    expected = ["Page", "Query", "Source", "Sources", "__version__", "show", "to_html", "write"]
+    assert ttl3d.__all__ == expected                     # in ruff RUF022 order
 
 
 def test_show_checks_the_height_when_called_not_when_displayed(library):
@@ -242,3 +242,20 @@ def test_build_page_reports_the_slice_through_notice_and_the_api_stays_silent(li
     assert seen == ["kept 3 of 12 nodes (schema only; focus ex:Book, 2 hops)"]
     ttl3d.to_html([library, library_extra], focus=["ex:Dune"])
     assert capsys.readouterr() == ("", "")
+
+
+Q = "PREFIX ex: <http://example.org/q#> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+
+
+def test_to_html_takes_a_query_and_the_api_stays_silent(endpoint, capsys):
+    html = ttl3d.to_html(ttl3d.Query(endpoint.url + "/sparql", Q))
+    assert "<title>127.0.0.1</title>" in html and len(_page_data(html)["nodes"]) == 2
+    assert capsys.readouterr() == ("", "")
+    assert "Query" in ttl3d.__all__ and ttl3d.Query is load.sparql.Query
+
+
+def test_the_fetch_notice_comes_before_the_slice_notice(endpoint):
+    seen = []
+    api.build_page(ttl3d.Query(endpoint.url + "/sparql", Q), focus=["ex:a"], hops=0, notice=seen.append)
+    assert seen[0].startswith("fetched 2 triples from 127.0.0.1 in ")
+    assert seen[1] == "kept 1 of 2 nodes (focus ex:a, 0 hops)"

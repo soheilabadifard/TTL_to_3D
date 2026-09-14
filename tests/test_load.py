@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from rdflib import Graph, Namespace, URIRef
 
-from ttl3d import graph, load
+from ttl3d import graph, load, sparql
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -365,3 +365,72 @@ def test_curie_shortens_through_the_bound_prefixes_and_keeps_unbound_iris_whole(
     assert load.curie(URIRef("http://example.org/nt#G"), p) == "http://example.org/nt#G"
     # an IRI ending in / or # has an empty local part: the IRI itself
     assert load.curie(URIRef("http://example.org/graphs/"), p) == "http://example.org/graphs/"
+
+
+Q = "PREFIX ex: <http://example.org/q#> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+
+
+def test_a_query_is_a_source_named_after_the_endpoint_host_unless_paired(endpoint):
+    q = sparql.Query(endpoint.url + "/sparql", Q)
+    ds = load.load(q)
+    assert ds.stems == ["127.0.0.1"] and ds.sources == ["127.0.0.1"] and ds.files == []
+    assert len(ds.merged) == 2
+    assert load.load(("moons", q)).stems == ["moons"]
+    assert load.load({"moons": q}).stems == ["moons"]
+    assert load.load([q, q]).stems == ["127.0.0.1", "127.0.0.1~2"]
+
+
+def test_a_query_prefix_names_the_namespace_when_the_answer_is_n_triples(endpoint):
+    ds = load.load(sparql.Query(endpoint.url + "/nt", Q))
+    assert ds.prefixes["http://example.org/q#"] == "ex"
+
+
+def test_an_earlier_source_binding_wins_over_the_query_prefix(endpoint, tmp_path):
+    f = tmp_path / "first.ttl"
+    f.write_text("@prefix q: <http://example.org/q#> .\nq:x q:p q:y .\n", encoding="utf-8")
+    ds = load.load([f, sparql.Query(endpoint.url + "/nt", Q)])
+    assert ds.prefixes["http://example.org/q#"] == "q" and ds.stems == ["first", "127.0.0.1"]
+
+
+def test_a_quad_answer_is_folded_into_the_query_row(endpoint):
+    ds = load.load(sparql.Query(endpoint.url + "/trig", Q))
+    assert ds.stems == ["127.0.0.1"] and ds.named == {} and len(ds.graphs["127.0.0.1"]) == 2
+
+
+def test_relative_iris_in_an_answer_resolve_against_the_endpoint(endpoint):
+    ds = load.load(sparql.Query(endpoint.url + "/relative", Q))
+    assert {str(s) for s in ds.merged.subjects()} == {endpoint.url + "/rel/a"}
+
+
+def test_the_fetch_is_announced_through_notice_and_only_when_something_was_fetched(endpoint, library):
+    seen = []
+    load.load(sparql.Query(endpoint.url + "/sparql", Q), notice=seen.append)
+    assert len(seen) == 1 and seen[0].endswith(" s")
+    assert seen[0].startswith("fetched 2 triples from 127.0.0.1 in ")
+    seen.clear()
+    load.load([library], notice=seen.append)
+    assert seen == []
+
+
+def test_format_never_applies_to_a_query(endpoint):
+    ds = load.load(sparql.Query(endpoint.url + "/nt", Q), fmt="json-ld")      # the answer says what it is
+    assert len(ds.merged) == 1
+
+
+def test_an_empty_answer_is_a_source_with_nothing_in_it(endpoint):
+    seen = []
+    ds = load.load(sparql.Query(endpoint.url + "/empty", Q), notice=seen.append)
+    assert ds.stems == ["127.0.0.1"] and len(ds.merged) == 0
+    assert seen[0].startswith("fetched 0 triples from 127.0.0.1 in ")
+
+
+def test_a_query_counts_as_a_source_in_the_type_error_message():
+    with pytest.raises(TypeError, match="a sparql.Query"):
+        load.load(42)
+
+
+def test_the_notice_names_the_credentials_sent_and_never_the_token(endpoint):
+    seen = []
+    load.load(sparql.Query(endpoint.url + "/auth", Q, token="tok123"), notice=seen.append)
+    assert seen[0].endswith(" s with a Bearer token over plain http")
+    assert "tok123" not in seen[0]
