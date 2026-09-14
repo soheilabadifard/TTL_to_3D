@@ -366,3 +366,146 @@ def test_a_two_hop_slice_of_twenty_thousand_triples_takes_well_under_two_seconds
     data = graph.build(slice.select(ds, focus=[URIRef("http://g/s0")], hops=2).dataset)
     assert time.perf_counter() - start < 2.0                                  # about ten times what it takes
     assert 100 < len(data["nodes"]) < 2000
+
+
+Q = "PREFIX ex: <http://example.org/q#> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
+
+
+def test_a_query_is_a_source_named_after_the_host_and_announced_on_stderr(tmp_path, endpoint, monkeypatch,
+                                                                          capsys):
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", Q]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("2 nodes, 1 links -> ") and "127.0.0.1-3d.html" in captured.out
+    assert captured.err.startswith("fetched 2 triples from 127.0.0.1 in ") and captured.err.endswith(" s\n")
+    page = (tmp_path / "127.0.0.1-3d.html").read_text(encoding="utf-8")
+    assert "<title>127.0.0.1</title>" in page and '"groups": ["127.0.0.1"]' in page
+
+
+def test_a_query_file_is_named_by_its_stem_and_mixes_with_files(tmp_path, endpoint, library, library_extra,
+                                                                 capsys):
+    rq = tmp_path / "moons.rq"
+    rq.write_text(Q, encoding="utf-8")
+    out = tmp_path / "mix.html"
+    argv = [str(library), str(library_extra), "--endpoint", endpoint.url + "/sparql", "--query", f"@{rq}",
+            "-o", str(out)]
+    assert cli.main(argv) == 0
+    page = out.read_text(encoding="utf-8")
+    assert "<title>library</title>" in page and '"groups": ["library", "library-extra", "moons"]' in page
+    assert capsys.readouterr().out.startswith("14 nodes, 7 links")
+
+
+def test_two_inline_queries_get_two_legend_rows(tmp_path, endpoint):
+    out = tmp_path / "two.html"
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", Q, "--query", Q, "-o", str(out)]) == 0
+    assert '"groups": ["127.0.0.1", "127.0.0.1~2"]' in out.read_text(encoding="utf-8")
+
+
+def test_the_output_may_not_overwrite_a_query_file(tmp_path, endpoint, capsys):
+    rq = tmp_path / "moons.rq"
+    rq.write_text(Q, encoding="utf-8")
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", f"@{rq}", "-o", str(rq)]) == 1
+    expected = f"ttl3d: error: output {rq} is also an input file; pick another -o path\n"
+    assert capsys.readouterr().err == expected
+    assert rq.read_text(encoding="utf-8") == Q and endpoint.requests == []
+
+
+def test_credentials_come_from_the_environment(tmp_path, endpoint, monkeypatch):
+    out = tmp_path / "a.html"
+    monkeypatch.setenv("TTL3D_SPARQL_USER", "bob")
+    monkeypatch.setenv("TTL3D_SPARQL_PASSWORD", "s3cret")
+    assert cli.main(["--endpoint", endpoint.url + "/auth", "--query", Q, "-o", str(out)]) == 0
+    monkeypatch.delenv("TTL3D_SPARQL_USER")
+    monkeypatch.delenv("TTL3D_SPARQL_PASSWORD")
+    monkeypatch.setenv("TTL3D_SPARQL_TOKEN", "tok123")
+    assert cli.main(["--endpoint", endpoint.url + "/auth", "--query", Q, "-o", str(out)]) == 0
+    sent = [h["Authorization"] for _, h, _ in endpoint.requests]
+    assert sent == ["Basic Ym9iOnMzY3JldA==", "Bearer tok123"]
+
+
+ENDPOINT = ["--endpoint", "http://127.0.0.1:9/sparql", "--query", "CONSTRUCT {} WHERE {}"]
+
+
+@pytest.mark.parametrize(("argv", "message"), [
+    (["--query", "CONSTRUCT {} WHERE {}"], "--query needs --endpoint"),
+    (["--endpoint", "http://127.0.0.1:9/sparql"], "--endpoint needs --query"),
+    ([], "at least one file or --query is needed"),
+    ([*ENDPOINT, "--timeout", "0"], "timeout must be a positive number of seconds, got 0.0"),
+    ([*ENDPOINT, "--timeout", "inf"], "timeout must be a positive number of seconds, got inf"),
+    ([*ENDPOINT, "--max-mb", "0"], "--max-mb must be a positive number of megabytes"),
+    (["--endpoint", "https://bob:pw@127.0.0.1:9/sparql", "--query", "CONSTRUCT {} WHERE {}"],
+     ("the endpoint URL must not carry credentials; use TTL3D_SPARQL_USER and TTL3D_SPARQL_PASSWORD or "
+      "TTL3D_SPARQL_TOKEN (auth= or token= in Python)")),
+])
+def test_query_option_mistakes_are_one_line_errors(argv, message, capsys):
+    assert cli.main(argv) == 1
+    assert capsys.readouterr().err == f"ttl3d: error: {message}\n"
+
+
+def test_both_credential_variables_set_is_an_error(monkeypatch, capsys):
+    monkeypatch.setenv("TTL3D_SPARQL_USER", "bob")
+    monkeypatch.setenv("TTL3D_SPARQL_TOKEN", "tok")
+    assert cli.main(ENDPOINT) == 1
+    both = "ttl3d: error: set either TTL3D_SPARQL_TOKEN or TTL3D_SPARQL_USER, not both\n"
+    assert capsys.readouterr().err == both
+
+
+def test_every_query_is_checked_before_anything_is_sent(tmp_path, endpoint, capsys):
+    out = tmp_path / "e.html"
+    select = "SELECT * WHERE { ?s ?p ?o }"
+    argv = ["--endpoint", endpoint.url + "/sparql", "--query", Q, "--query", select, "-o", str(out)]
+    assert cli.main(argv) == 1
+    assert capsys.readouterr().err == "ttl3d: error: the query must be CONSTRUCT or DESCRIBE, not SELECT\n"
+    assert endpoint.requests == [] and not out.exists()
+
+
+def test_endpoint_failures_are_one_line_errors(tmp_path, endpoint, capsys):
+    out = tmp_path / "e.html"
+    assert cli.main(["--endpoint", endpoint.url + "/500", "--query", Q, "-o", str(out)]) == 1
+    assert capsys.readouterr().err == (
+        "ttl3d: error: endpoint 127.0.0.1/500 answered 500: Virtuoso 37000 Error SP030: SPARQL compiler\n")
+    big = ["--endpoint", endpoint.url + "/big", "--query", Q, "--max-mb", "0.001", "-o", str(out)]
+    assert cli.main(big) == 1
+    assert "answered more than 0.001 MB" in capsys.readouterr().err
+    missing = f"@{tmp_path / 'missing.rq'}"
+    assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", missing, "-o", str(out)]) == 1
+    assert "missing.rq" in capsys.readouterr().err and not out.exists()
+
+
+def test_an_empty_answer_gives_an_empty_page_and_says_so(tmp_path, endpoint, capsys):
+    out = tmp_path / "e.html"
+    assert cli.main(["--endpoint", endpoint.url + "/empty", "--query", Q, "-o", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("0 nodes, 0 links") and captured.err.startswith("fetched 0 triples from ")
+    assert out.exists()
+
+
+def test_focus_applies_to_a_query_source(tmp_path, endpoint, capsys):
+    out = tmp_path / "f.html"
+    argv = ["--endpoint", endpoint.url + "/sparql", "--query", Q, "--focus", "ex:a", "--hops", "0",
+            "-o", str(out)]
+    assert cli.main(argv) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("1 nodes, 0 links")
+    assert captured.err.splitlines()[1] == "kept 1 of 2 nodes (focus ex:a, 0 hops)"
+
+
+def test_standard_input_and_a_query_mix_and_the_first_source_names_the_page(tmp_path, endpoint, library):
+    argv = ["-", "--endpoint", endpoint.url + "/sparql", "--query", Q]
+    r = _run_with_stdin(argv, library.read_bytes(), tmp_path)
+    assert r.returncode == 0, r.stderr.decode()
+    assert "<title>stdin</title>" in (tmp_path / "stdin-3d.html").read_text(encoding="utf-8")
+    assert b"fetched 2 triples from 127.0.0.1" in r.stderr
+
+
+def test_a_query_page_is_identical_across_processes(tmp_path, endpoint):
+    pages = []
+    for seed in ("1", "2"):
+        out = tmp_path / f"q-{seed}.html"
+        argv = [sys.executable, "-m", "ttl3d", "--endpoint", endpoint.url + "/sparql", "--query", Q,
+                "-o", str(out)]
+        r = subprocess.run(argv, capture_output=True, text=True, cwd=REPO, check=False,
+                           env={**os.environ, "PYTHONHASHSEED": seed}, timeout=60)
+        assert r.returncode == 0, r.stderr
+        pages.append(out.read_bytes())
+    assert pages[0] == pages[1]
