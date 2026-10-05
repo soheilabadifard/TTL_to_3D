@@ -366,7 +366,8 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
             assert page.evaluate("DATA.nodes.filter(n => n._dim).length") == dimmed
             assert page.evaluate("DATA.nodes.every(n => n.fx === n.__pos['3d'][0] "
                                  "&& n.fz === n.__pos['3d'][2])")
-            assert page.evaluate("DATA.nodes.every(n => n.__threeObj && n.__threeObj.parent)")  # rebuilt
+            # rebuilt: kapsule debounces the data update by 1 ms, so the objects arrive just after the switch
+            page.wait_for_function("DATA.nodes.every(n => n.__threeObj && n.__threeObj.parent)", timeout=5000)
             assert page.evaluate("document.querySelectorAll('#graph canvas').length") == 1
             assert "drag to rotate" in page.evaluate("document.getElementById('nav').textContent")
         finally:

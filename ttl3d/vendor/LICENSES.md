@@ -44,14 +44,14 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 - d3-octree 1.1.0 — Copyright (c) 2017 Vasco Asturiano
 - data-bind-mapper 1.0.3 — Copyright (c) 2024 Vasco Asturiano
 - float-tooltip 1.7.5 — Copyright (c) 2022 Vasco Asturiano
-- force-graph 1.51.4 — Copyright (c) 2018 Vasco Asturiano
+- force-graph 1.51.5 — Copyright (c) 2018 Vasco Asturiano
 - index-array-by 1.4.2 — Copyright (c) 2018 Vasco Asturiano
 - kapsule 1.16.3 — Copyright (c) 2017 Vasco Asturiano
 - lodash-es 4.18.1 — Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
 - ngraph.merge 1.0.0 — Copyright (c) 2013-2019 Andrei Kashcha
 - polished 4.3.1 — Copyright (c) 2016-Present Brian Hough and Maximilian Stoiber
 - preact 10.29.8 — Copyright (c) 2015-present Jason Miller
-- three 0.185.1 — Copyright © 2010-2026 three.js authors
+- three 0.186.1 — Copyright © 2010-2026 three.js authors
 - three-forcegraph 1.43.4 — Copyright (c) 2017 Vasco Asturiano
 - three-render-objects 1.42.0 — Copyright (c) 2018 Vasco Asturiano
 - three-spritetext 1.10.0 — Copyright (c) 2018 Vasco Asturiano

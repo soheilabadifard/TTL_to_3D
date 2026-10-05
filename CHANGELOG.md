@@ -4,6 +4,12 @@
 
 Nothing yet.
 
+## 0.7.1 (2026-10-05)
+
+Vendored bundle: force-graph 1.51.5 and three.js 0.186.1 (Dependabot #23). Pages look and
+behave as before. A browser test that checked the 3D scene straight after a 2D-to-3D switch now
+waits for it: the scene is rebuilt a few milliseconds later, so the test failed on fast machines.
+
 ## 0.7.0 (2026-09-14)
 
 SPARQL endpoints as sources: `--endpoint URL --query TEXT|@FILE` (repeatable) fetches a CONSTRUCT or
