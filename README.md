@@ -140,6 +140,9 @@ source.
   without a further `/` or `#` (so `urn:` vocabularies shorten too), otherwise at the
   last `/` or `#`. Legend keys, the namespace column and local names all use this one
   rule.
+- Types, edge labels and property names are local names, unless two IRIs share one: then
+  both show their prefix (FOAF types its classes `owl:Class` and `rdfs:Class`; `dc:title`
+  and `dcterms:title`), or the full IRI when their namespace has no prefix.
 
 ## Slicing a big graph
 
@@ -188,10 +191,10 @@ names; relative IRIs in an answer resolve against the endpoint. Protected endpoi
 `TTL3D_SPARQL_USER`/`TTL3D_SPARQL_PASSWORD` or `TTL3D_SPARQL_TOKEN` from the environment, and nothing
 ttl3d prints shows them. ttl3d sends them to whatever endpoint the command names, so set them for one
 command (`TTL3D_SPARQL_TOKEN=... ttl3d ...`) rather than exporting them; the fetch line on stderr says
-when credentials went out, and when they went over plain http. Errors are one line: a query that is not
-CONSTRUCT or DESCRIBE is refused before anything is sent, an HTTP error quotes the endpoint's first
-line, a slow endpoint stops at `--timeout` (60 s per network step by default), a redirect is refused
-with the URL to use, and an answer that is not RDF (Turtle, N-Triples, RDF/XML, N3 or a quad format;
+when credentials went out, and when they went over plain http. Errors are one line, and name the
+endpoint's port when its URL gives one: a query that is not CONSTRUCT or DESCRIBE is refused before
+anything is sent, an HTTP error quotes the endpoint's first line, a slow endpoint stops at `--timeout`
+(60 s per network step by default), a redirect is refused with the URL to use, and an answer that is not RDF (Turtle, N-Triples, RDF/XML, N3 or a quad format;
 JSON-LD is refused too), is larger than `--max-mb` (100 MB) or breaks off midway is refused rather than
 drawn in part. RDF/XML and TriX, from an endpoint or a file, pass through Python's expat parser before
 rdflib reads them: entities that nest into gigabytes ("billion laughs") are refused in milliseconds,
@@ -220,6 +223,10 @@ further.
   search text and the open card carry over, and in pinned mode each view has its own
   precomputed stress layout. A browser without WebGL opens in 2D and says so.
 - Search dims everything whose label does not match.
+- The keyboard works too: Tab reaches the legend rows (Enter or Space toggles one), Enter in
+  the search box opens the card of the best match (the exact label, then labels starting with
+  the text), Tab and Enter walk the card's relations to the neighbours' cards, and Esc closes
+  the card. Legend rows, relations and the close button are labelled for screen readers.
 - Click a node for its card: types, source (the file, or the named graph with its IRI), namespace,
   definition, synonyms, properties, incoming and outgoing relations (clickable), and sources.
 - The label toggles rebuild the scene, so a big graph can start without
