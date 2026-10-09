@@ -58,7 +58,7 @@ def test_cli_rejects_an_unknown_color_key(library):
 def test_module_entry_point_runs(tmp_path, library):
     out = tmp_path / "m.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(library), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     assert out.exists()
 
@@ -86,6 +86,18 @@ def test_cli_malformed_file_is_a_clean_error(tmp_path, capsys):
     err = capsys.readouterr().err
     assert err.startswith("ttl3d: error:") and "bad.ttl" in err
     assert err.count("\n") == 1
+
+
+def test_running_out_of_memory_is_a_one_line_error(tmp_path, library, monkeypatch, capsys):
+    def build_page(*args, **kwargs):
+        raise MemoryError
+    monkeypatch.setattr(cli.api, "build_page", build_page)
+    out = tmp_path / "x.html"
+    assert cli.main([str(library), "-o", str(out)]) == 1
+    assert capsys.readouterr().err == (
+        "ttl3d: error: out of memory while building the page; try a smaller input or, for a query, "
+        "a narrower query or a lower --max-mb\n")
+    assert not out.exists()
 
 
 def test_cli_refuses_to_overwrite_an_input(tmp_path, library, capsys):
@@ -139,7 +151,7 @@ def test_cli_output_is_identical_across_processes(tmp_path, view, inputs, extra)
         r = subprocess.run([sys.executable, "-m", "ttl3d", *(str(REPO / p) for p in inputs),
                             "-o", str(out), "--view", view, *extra],
                            capture_output=True, text=True, cwd=REPO, check=False,
-                           env={**os.environ, "PYTHONHASHSEED": seed})
+                           env={**os.environ, "PYTHONHASHSEED": seed}, timeout=300)
         assert r.returncode == 0, r.stderr
         pages.append(out.read_bytes())
     assert pages[0] == pages[1]
@@ -230,7 +242,7 @@ def test_an_error_message_survives_a_console_that_cannot_encode_it(tmp_path):
     bad = tmp_path / "données.ttl"
     bad.write_text("@prefix ex: <http://example.org/é#> .\nex:a ex:b \"unterminated .\n", encoding="utf-8")
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(bad), "-o", str(tmp_path / "out.html")],
-                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False)
+                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False, timeout=300)
     err = r.stderr.decode("ascii")
     assert r.returncode == 1 and err.startswith("ttl3d: error:") and "Traceback" not in err, err
 
@@ -238,14 +250,14 @@ def test_an_error_message_survives_a_console_that_cannot_encode_it(tmp_path):
 def test_the_summary_line_survives_a_console_that_cannot_encode_the_output_path(tmp_path, library):
     out = tmp_path / "sortie-é.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(library), "-o", str(out)],
-                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False)
+                       capture_output=True, env=ASCII_CONSOLE, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0 and out.exists(), r.stderr.decode("ascii", "replace")
     assert r.stdout.decode("ascii").split()[0].isdigit()
 
 
 def _run_with_stdin(args, stdin: bytes, cwd):
     return subprocess.run([sys.executable, "-m", "ttl3d", *args], input=stdin, capture_output=True,
-                          cwd=cwd, check=False)
+                          cwd=cwd, check=False, timeout=300)
 
 
 def test_a_dash_reads_turtle_from_standard_input_and_names_the_page_stdin(tmp_path, library):
@@ -362,6 +374,19 @@ def _generated(tmp_path, subjects=2000, links=9):
     return nt
 
 
+def test_the_layout_follows_the_slice_and_the_notices_come_slice_first(tmp_path, capsys):
+    nt, out = _generated(tmp_path), tmp_path / "gen.html"
+    assert cli.main([str(nt), "--focus", "<http://g/s0>", "--hops", "2", "-o", str(out)]) == 0
+    captured = capsys.readouterr()                  # 2000 nodes in all; 335 kept: a pinned stress layout
+    assert captured.err.splitlines() == ["kept 335 of 2000 nodes (focus http://g/s0, 2 hops)",
+                                         "computing stress layouts (3D and 2D) for 335 nodes..."]
+    assert "layout: stress" in captured.out
+    assert cli.main([str(nt), "--focus", "<http://g/s0>", "--hops", "3", "-o", str(out)]) == 0
+    captured = capsys.readouterr()                  # 1918 kept: still past STRESS_MAX_NODES, so force
+    assert captured.err.splitlines() == ["kept 1918 of 2000 nodes (focus http://g/s0, 3 hops)"]
+    assert "layout: force" in captured.out
+
+
 def test_a_two_hop_slice_of_a_generated_graph_is_identical_across_processes(tmp_path):
     nt = _generated(tmp_path)
     pages = []
@@ -369,7 +394,7 @@ def test_a_two_hop_slice_of_a_generated_graph_is_identical_across_processes(tmp_
         out = tmp_path / f"gen-{seed}.html"
         r = subprocess.run([sys.executable, "-m", "ttl3d", str(nt), "--focus", "<http://g/s0>", "--hops", "2",
                             "--layout", "force", "-o", str(out)], capture_output=True, text=True, cwd=REPO,
-                           check=False, env={**os.environ, "PYTHONHASHSEED": seed})
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed}, timeout=300)
         assert r.returncode == 0, r.stderr
         assert r.stderr.startswith("kept ")
         assert r.stderr.endswith(" of 2000 nodes (focus http://g/s0, 2 hops)\n")
@@ -395,7 +420,7 @@ def test_a_query_is_a_source_named_after_the_host_and_announced_on_stderr(tmp_pa
     assert cli.main(["--endpoint", endpoint.url + "/sparql", "--query", Q]) == 0
     captured = capsys.readouterr()
     assert captured.out.startswith("2 nodes, 1 links -> ") and "127.0.0.1-3d.html" in captured.out
-    assert captured.err.startswith("fetched 2 triples from 127.0.0.1 in ") and captured.err.endswith(" s\n")
+    assert captured.err.startswith(f"fetched 2 triples from {endpoint.where} in ") and captured.err.endswith(" s\n")
     page = (tmp_path / "127.0.0.1-3d.html").read_text(encoding="utf-8")
     assert "<title>127.0.0.1</title>" in page and '"groups": ["127.0.0.1"]' in page
 
@@ -486,7 +511,7 @@ def test_endpoint_failures_are_one_line_errors(tmp_path, endpoint, capsys):
     out = tmp_path / "e.html"
     assert cli.main(["--endpoint", endpoint.url + "/500", "--query", Q, "-o", str(out)]) == 1
     assert capsys.readouterr().err == (
-        "ttl3d: error: endpoint 127.0.0.1/500 answered 500: Virtuoso 37000 Error SP030: SPARQL compiler\n")
+        f"ttl3d: error: endpoint {endpoint.where}/500 answered 500: Virtuoso 37000 Error SP030: SPARQL compiler\n")
     big = ["--endpoint", endpoint.url + "/big", "--query", Q, "--max-mb", "0.001", "-o", str(out)]
     assert cli.main(big) == 1
     assert "answered more than 0.001 MB" in capsys.readouterr().err

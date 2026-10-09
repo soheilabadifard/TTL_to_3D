@@ -45,7 +45,7 @@ def test_demo_page_runs_without_console_errors(tmp_path):
     r = subprocess.run([sys.executable, "-m", "ttl3d",
                         str(REPO / "examples" / "solar-system.ttl"),
                         str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     # the CLI prints "<nodes> nodes, <links> links -> <path> ..." on success (see tests/test_cli.py)
     n_nodes = int(r.stdout.split()[0])
@@ -80,7 +80,7 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
                    + "ex:big1 a ex:C00 . ex:big2 a ex:C00 .\n", encoding="utf-8")
     out = tmp_path / "many.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(ttl), "-o", str(out), "--color-by", "type"],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -100,7 +100,7 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
 
 def _run_cli(*args):
     r = subprocess.run([sys.executable, "-m", "ttl3d", *args], capture_output=True, text=True, cwd=REPO,
-                       check=False)
+                       check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     return r
 
@@ -378,7 +378,7 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
 def test_the_card_of_a_node_from_a_named_graph_shows_the_graph_iri(tmp_path):
     out = tmp_path / "trig.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.trig"),
-                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -405,7 +405,7 @@ def test_selecting_a_re_asserting_source_keeps_its_edge_and_an_annotation_only_s
     out = tmp_path / "three.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.ttl"),
                         str(tmp_path / "again.ttl"), str(tmp_path / "notes.ttl"), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -434,7 +434,7 @@ def test_type_mode_selection_ignores_a_source_whose_name_matches_a_type(tmp_path
     shutil.copy(REPO / "tests" / "fixtures" / "library.ttl", tmp_path / "Book.ttl")
     out = tmp_path / "book.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(tmp_path / "Book.ttl"), "--color-by", "type",
-                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:

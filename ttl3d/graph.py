@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
 
-from .load import Dataset, local, namespace_of
+from .load import Dataset, local, namespace_of, split_iri
 
 COLOR_KEYS = ("file", "type", "namespace")
 RESERVED = tuple(str(ns) for ns in (RDF, RDFS, OWL, XSD))
@@ -90,6 +90,27 @@ def _prefix(ds: Dataset, ns: str) -> str:
     return ns
 
 
+def _names(iris, prefixes) -> dict:
+    """A display name per IRI: its local name, unless another IRI of the set shares that local name
+    (FOAF types its classes rdfs:Class and owl:Class); then prefix:local, or the full IRI when the
+    namespace has no prefix or two namespaces share one."""
+    by_local = defaultdict(list)
+    for iri in iris:
+        by_local[local(iri, prefixes)].append(iri)
+    names = {}
+    for name, same in by_local.items():
+        if len(same) == 1:
+            names[same[0]] = name
+            continue
+        qualified = {}
+        for iri in same:
+            ns, loc = split_iri(iri, prefixes)
+            qualified[iri] = f"{prefixes[ns]}:{loc}" if ns in prefixes and loc else str(iri)
+        unique = len(set(qualified.values())) == len(same)
+        names.update({iri: q if unique else str(iri) for iri, q in qualified.items()})
+    return names
+
+
 def resolve_terms(terms, ds: Dataset) -> set:
     """Turn 'prefix:local', full IRIs, or '<...>'-wrapped IRIs into URIRefs using the
     dataset's bindings. Angle brackets are the Turtle convention for "this is a full
@@ -141,13 +162,17 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     merged_links: dict = defaultdict(lambda: {"fwd": set(), "rev": set()})   # pair -> predicates per direction
     node_ids = set()
+    node_preds = set()            # every predicate a card or an edge label may name
     for s, p, o in g:
         if eligible(s):
             node_ids.add(s)
+            node_preds.add(p)
         if is_link(s, p, o):
             node_ids.add(o)
             a, b = sorted((s, o), key=str)
-            merged_links[(a, b)]["fwd" if s == a else "rev"].add(local(p, prefixes))
+            merged_links[(a, b)]["fwd" if s == a else "rev"].add(p)
+    pred_name = _names(node_preds, prefixes)
+    type_name = _names({t for n in node_ids for t in g.objects(n, RDF.type) if isinstance(t, URIRef)}, prefixes)
 
     labels = {}
     for s in node_ids:
@@ -166,7 +191,8 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     nodes = []
     for n in sorted(node_ids, key=str):
-        types = sorted(local(t, prefixes) for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
+        types = sorted(type_name.get(t) or local(t, prefixes)
+                       for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
         label_vals = [str(o) for p in LABEL_PREDS for o in _literals(g, n, p, lang)]
         definition = _first(g, n, DEFINITION_PREDS, lang)
         def_pred = next((p for p in DEFINITION_PREDS if _literals(g, n, p, lang)), None)
@@ -177,9 +203,9 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
                     continue
                 if p == def_pred and str(o) == definition:
                     continue
-                props[local(p, prefixes)].append(str(o))
+                props[pred_name[p]].append(str(o))
             elif isinstance(o, URIRef) and p in attribute and p != RDF.type and p not in SOURCE_PREDS:
-                props[local(p, prefixes)].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
+                props[pred_name[p]].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
         sources = [{"label": label, "url": src_url.get(s)}
                    for label, s in sorted(
@@ -201,8 +227,8 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
     for (a, b), d in sorted(merged_links.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
         src, tgt, fwd, rev = (a, b, d["fwd"], d["rev"]) if d["fwd"] else (b, a, d["rev"], d["fwd"])
         files = link_files.get((a, b), [])
-        links.append({"source": str(src), "target": str(tgt), "predicates": sorted(fwd),
-                      "reverse": sorted(rev), "files": files,
+        links.append({"source": str(src), "target": str(tgt), "predicates": sorted(pred_name[p] for p in fwd),
+                      "reverse": sorted(pred_name[p] for p in rev), "files": files,
                       "group": (files[0] if files else "?") if color_by == "file" else None})
 
     groups = {n["group"] for n in nodes}

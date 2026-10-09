@@ -23,7 +23,9 @@ TriX, JSON-LD with named @graph blocks) is a source of its own, keyed by its pre
 """
 from __future__ import annotations
 
+import logging
 import os
+import pyexpat
 import time
 import warnings
 from collections.abc import Callable, Iterable, Mapping
@@ -103,6 +105,8 @@ def _parsed(name: str, fmt: str, parse) -> RdfDataset:
             # thread-safe, as Python documents)
             warnings.simplefilter("ignore", DeprecationWarning)
             parse(rds, fmt)
+    except MemoryError:     # the input is too big for this machine, not malformed
+        raise
     except Exception as e:  # every rdflib parser plugin raises its own class
         # collapse whitespace: rdflib's BadSyntax (and others) embed literal
         # newlines, and the message must stay on one stderr line
@@ -111,19 +115,64 @@ def _parsed(name: str, fmt: str, parse) -> RdfDataset:
     return rds
 
 
+XML_FORMATS = frozenset({"xml", "application/rdf+xml", "trix", "application/trix"})
+
+
+def _expat_first(source: Path | bytes, fmt: str) -> None:
+    """Run an XML document through bare expat (no handlers, no external entities) before rdflib sees
+    it. On a 1 KB document whose entities nest ("billion laughs") rdflib's RDF/XML and TriX parsers
+    spend about a minute of CPU before expat's amplification limit stops them; bare expat stops in
+    milliseconds, and its ExpatError becomes the LoadError."""
+    if fmt not in XML_FORMATS:
+        return
+    parser = pyexpat.ParserCreate()
+    if isinstance(source, (bytes, str)):
+        parser.Parse(source, True)
+    else:
+        with open(source, "rb") as fh:
+            parser.ParseFile(fh)
+
+
 def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
     """Parse one file. Without an explicit format the extension decides; if that
     parser rejects the file, try Turtle once (Turtle saved as .owl is common)."""
     guessed = fmt or guess_format(str(f)) or "turtle"
+
+    def parse(rds, fm):
+        _expat_first(f, fm)
+        rds.parse(f, format=fm)
+
     try:
-        return _parsed(str(f), guessed, lambda rds, fm: rds.parse(f, format=fm))
+        return _parsed(str(f), guessed, parse)
     except LoadError:
         if fmt is None and guessed != "turtle":
+            # Turtle reads XML markup as IRIs and rdflib logs a warning for each: hold the retry's
+            # records back, and pass them on only if the retry is the parse that counts
+            logger, held = logging.getLogger("rdflib.term"), _HeldBack()
+            logger.addFilter(held)
             try:
-                return _parse(f, "turtle")
+                rds = _parse(f, "turtle")
             except LoadError:
-                pass
+                rds = None
+            finally:
+                logger.removeFilter(held)
+            if rds is not None:
+                for record in held.records:
+                    logger.handle(record)
+                return rds
         raise
+
+
+class _HeldBack(logging.Filter):
+    """Keeps every record logged while it is attached instead of letting it through."""
+
+    def __init__(self):
+        super().__init__()
+        self.records = []
+
+    def filter(self, record) -> bool:
+        self.records.append(record)
+        return False
 
 
 def parse_data(data: bytes, fmt: str | None = None, name: str = "data",
@@ -132,7 +181,11 @@ def parse_data(data: bytes, fmt: str | None = None, name: str = "data",
     no extension to guess from and no retry. A failure is a LoadError naming `name`. Relative IRIs
     resolve against `base` (a SPARQL answer passes its endpoint), else against the working
     directory, as rdflib does for data without a base; declare @base in the data to be explicit."""
-    return _parsed(name, fmt or "turtle", lambda rds, fm: rds.parse(data=data, format=fm, publicID=base))
+    def parse(rds, fm):
+        _expat_first(data, fm)
+        rds.parse(data=data, format=fm, publicID=base)
+
+    return _parsed(name, fmt or "turtle", parse)
 
 
 def _contexts(rds: RdfDataset):
@@ -243,7 +296,7 @@ def load(sources: Sources, fmt: str | None = None, *,
             body, media = sparql.fetch(obj)
             rds = parse_data(body, media or "text/turtle", key, base=obj.endpoint)
             if notice:
-                notice(f"fetched {len(rds)} triples from {sparql.host(obj.endpoint)} "
+                notice(f"fetched {len(rds)} triples from {sparql.netloc(obj.endpoint)} "
                        f"in {time.perf_counter() - started:.1f} s{sparql.sent_with(obj)}")
             for prefix, ns in sparql.prefixes_in(obj.query).items():   # the author's names first
                 prefixes.setdefault(ns, prefix)

@@ -135,7 +135,8 @@ def test_viewer_js_is_valid_javascript(tmp_path):
         js = js.replace(key, "{}")
     probe = tmp_path / "viewer-probe.js"
     probe.write_text(js, encoding="utf-8")
-    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True, check=False)
+    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True, check=False,
+                       timeout=300)
     assert r.returncode == 0, r.stderr
 
 
@@ -172,7 +173,7 @@ def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
             f"render.write_html('<title>B\\u00fccher</title>', {str(out)!r})")
     env = {**os.environ, "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0", "LC_ALL": "C", "LANG": "C"}
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO,
-                       check=False)
+                       check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     assert out.read_bytes() == "<title>Bücher</title>".encode()
 

@@ -1,8 +1,10 @@
 """ttl3d.load: parse one or more RDF files, keeping which file said what."""
 import json
 import os
+import pyexpat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -209,6 +211,13 @@ def test_an_nquads_blank_node_graph_joins_the_stem_and_an_unbound_graph_iri_stay
     assert ds.named == {"http://example.org/nt#G": URIRef("http://example.org/nt#G")}
 
 
+def test_trix_loads_like_its_nquads_twin(tiny_nq, tiny_trix):
+    nq, trix = load.load_files([tiny_nq]), load.load_files([tiny_trix])
+    assert trix.stems == nq.stems == ["tiny", "http://example.org/nt#G"]     # the unnamed graph folds in
+    assert trix.named == nq.named
+    assert {k: set(g) for k, g in trix.graphs.items()} == {k: set(g) for k, g in nq.graphs.items()}
+
+
 def test_a_quad_file_with_an_empty_default_graph_has_no_stem_key_but_keeps_its_source_name(tmp_path):
     trig = tmp_path / "only.trig"
     trig.write_text("@prefix ex: <http://example.org/o#> .\nex:g { ex:a ex:p ex:b . }\n", encoding="utf-8")
@@ -344,6 +353,79 @@ def test_a_file_that_fails_both_its_guessed_parser_and_the_turtle_retry_names_th
         load.load_files([bad])
 
 
+EXPAT_LIMITS = pytest.mark.skipif(pyexpat.version_info < (2, 4, 1),
+                                  reason="expat before 2.4.1 has no amplification limit")
+
+
+@EXPAT_LIMITS
+def test_an_entity_bomb_in_an_rdf_xml_file_is_refused_in_one_line(tmp_path, xml_bomb):
+    bomb = tmp_path / "bomb.rdf"
+    bomb.write_bytes(xml_bomb)
+    started = time.perf_counter()
+    with pytest.raises(load.LoadError, match=r"bomb\.rdf: cannot parse as xml: .*amplification") as e:
+        load.load_files([bomb])
+    assert "\n" not in str(e.value)
+    assert time.perf_counter() - started < 10          # rdflib alone took a minute of CPU to give up
+
+
+@EXPAT_LIMITS
+def test_an_entity_bomb_in_trix_is_refused_as_quickly(tmp_path, xml_bomb):
+    bomb = tmp_path / "bomb.trix"
+    bomb.write_bytes(xml_bomb)
+    started = time.perf_counter()
+    with pytest.raises(load.LoadError, match=r"bomb\.trix: cannot parse as trix: .*amplification"):
+        load.load_files([bomb])
+    assert time.perf_counter() - started < 10
+
+
+def test_rdf_xml_that_declares_entities_the_usual_way_still_loads(tmp_path):
+    owl = tmp_path / "o.rdf"
+    owl.write_text('<?xml version="1.0"?>\n<!DOCTYPE rdf:RDF [<!ENTITY ex "http://example.org/o#">]>\n'
+                   '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:ex="&ex;">'
+                   '<rdf:Description rdf:about="&ex;a"><ex:p rdf:resource="&ex;b"/></rdf:Description>'
+                   '</rdf:RDF>\n', encoding="utf-8")
+    ds = load.load_files([owl])
+    assert set(ds.merged) == {(URIRef("http://example.org/o#a"), URIRef("http://example.org/o#p"),
+                               URIRef("http://example.org/o#b"))}
+
+
+def test_an_external_entity_in_an_rdf_xml_file_is_never_fetched(tmp_path, xml_peek):
+    peek = tmp_path / "peek.rdf"
+    peek.write_bytes(xml_peek)
+    ds = load.load_files([peek])
+    assert (URIRef("http://example.org/x#a"), None, None) in ds.merged
+    assert not any("Herbert" in str(o) for o in ds.merged.objects())      # library.ttl's text stayed out
+
+
+BROKEN_XML = ('<?xml version="1.0"?>\n<!DOCTYPE rdf:RDF [<!ENTITY ex "http://example.org/">]>\n'
+              '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><unclosed>\n')
+
+
+def test_the_discarded_turtle_retry_logs_nothing(tmp_path, caplog):
+    bad = tmp_path / "bad.rdf"
+    bad.write_text(BROKEN_XML, encoding="utf-8")        # Turtle reads its markup as IRIs and would log
+    caplog.clear()
+    with pytest.raises(load.LoadError, match=r"bad\.rdf: cannot parse as xml"):
+        load.load_files([bad])
+    assert caplog.records == []
+
+
+def test_a_successful_turtle_retry_keeps_its_own_log_lines(tmp_path, caplog):
+    owl = tmp_path / "t.owl"                            # Turtle saved as .owl, with an IRI rdflib warns about
+    owl.write_text("<http://example.org/a> <http://example.org/p> <http://example.org/b|c> .\n", encoding="utf-8")
+    caplog.clear()
+    assert len(load.load_files([owl]).merged) == 1
+    assert [r.name for r in caplog.records] == ["rdflib.term"]
+    assert "does not look like a valid URI" in caplog.records[0].getMessage()
+
+
+def test_running_out_of_memory_is_not_dressed_up_as_a_syntax_error():
+    def parse(rds, fmt):
+        raise MemoryError
+    with pytest.raises(MemoryError):
+        load._parsed("big.nt", "nt", parse)
+
+
 def test_json_ld_named_and_anonymous_graphs_load_like_trig(tmp_path):
     doc = tmp_path / "g.jsonld"
     doc.write_text(json.dumps({
@@ -368,7 +450,7 @@ def test_key_order_is_the_same_across_hash_seeds_and_the_loader_raises_no_deprec
             "warnings.simplefilter('error', DeprecationWarning)\n"
             "print(load.load_files([sys.argv[1]]).stems)\n")
     runs = [subprocess.run([sys.executable, "-c", code, str(library_trig)], capture_output=True, text=True,
-                           cwd=REPO, check=False, env={**os.environ, "PYTHONHASHSEED": seed})
+                           cwd=REPO, check=False, env={**os.environ, "PYTHONHASHSEED": seed}, timeout=300)
             for seed in ("1", "2")]
     for r in runs:
         assert r.returncode == 0, r.stderr
@@ -423,7 +505,7 @@ def test_the_fetch_is_announced_through_notice_and_only_when_something_was_fetch
     seen = []
     load.load(sparql.Query(endpoint.url + "/sparql", Q), notice=seen.append)
     assert len(seen) == 1 and seen[0].endswith(" s")
-    assert seen[0].startswith("fetched 2 triples from 127.0.0.1 in ")
+    assert seen[0].startswith(f"fetched 2 triples from {endpoint.where} in ")
     seen.clear()
     load.load([library], notice=seen.append)
     assert seen == []
@@ -438,7 +520,7 @@ def test_an_empty_answer_is_a_source_with_nothing_in_it(endpoint):
     seen = []
     ds = load.load(sparql.Query(endpoint.url + "/empty", Q), notice=seen.append)
     assert ds.stems == ["127.0.0.1"] and len(ds.merged) == 0
-    assert seen[0].startswith("fetched 0 triples from 127.0.0.1 in ")
+    assert seen[0].startswith(f"fetched 0 triples from {endpoint.where} in ")
 
 
 def test_a_query_counts_as_a_source_in_the_type_error_message():

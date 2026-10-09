@@ -193,7 +193,9 @@ CONSTRUCT or DESCRIBE is refused before anything is sent, an HTTP error quotes t
 line, a slow endpoint stops at `--timeout` (60 s per network step by default), a redirect is refused
 with the URL to use, and an answer that is not RDF (Turtle, N-Triples, RDF/XML, N3 or a quad format;
 JSON-LD is refused too), is larger than `--max-mb` (100 MB) or breaks off midway is refused rather than
-drawn in part. In Python the same source is `ttl3d.Query`:
+drawn in part. RDF/XML and TriX, from an endpoint or a file, pass through Python's expat parser before
+rdflib reads them: entities that nest into gigabytes ("billion laughs") are refused in milliseconds,
+and external entities are never fetched. In Python the same source is `ttl3d.Query`:
 
 ```python
 import ttl3d

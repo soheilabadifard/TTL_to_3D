@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the TriX twin of tiny.nq: one named graph, and an unnamed one that joins the file's own key -->
+<TriX xmlns="http://www.w3.org/2004/03/trix/trix-1/">
+  <graph>
+    <uri>http://example.org/nt#G</uri>
+    <triple>
+      <uri>http://example.org/nt#a</uri>
+      <uri>http://example.org/nt#links</uri>
+      <uri>http://example.org/nt#b</uri>
+    </triple>
+  </graph>
+  <graph>
+    <triple>
+      <uri>http://example.org/nt#a</uri>
+      <uri>http://www.w3.org/2000/01/rdf-schema#label</uri>
+      <plainLiteral>A</plainLiteral>
+    </triple>
+    <triple>
+      <uri>http://example.org/nt#a</uri>
+      <uri>http://example.org/nt#links</uri>
+      <uri>http://example.org/nt#c</uri>
+    </triple>
+  </graph>
+</TriX>

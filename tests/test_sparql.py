@@ -1,5 +1,7 @@
 """ttl3d.sparql: a CONSTRUCT or DESCRIBE result fetched from a SPARQL endpoint."""
+import pyexpat
 import sys
+import time
 import urllib.parse
 
 import pytest
@@ -56,6 +58,13 @@ def test_prefixes_come_from_the_prologue_only_resolved_against_base():
     assert sparql.prefixes_in(body) == {"a": "http://a/"}          # nothing after the prologue counts
 
 
+def test_messages_name_the_host_with_its_port_when_the_url_gives_one():
+    assert sparql._where("https://query.wikidata.org/sparql?x=1") == "query.wikidata.org/sparql"
+    assert sparql._where("http://h.org:8890/sparql") == "h.org:8890/sparql"
+    assert sparql._where("http://[::1]:8890/sparql") == "[::1]:8890/sparql"
+    assert sparql.netloc("http://h.org:8890/sparql") == "h.org:8890" and sparql.host("http://h.org:8890/s") == "h.org"
+
+
 def test_host_is_the_hostname_without_user_info_or_the_endpoint_itself():
     assert sparql.host("https://user:pw@query.wikidata.org/sparql") == "query.wikidata.org"
     assert sparql.host("not a url") == "not a url"
@@ -109,7 +118,7 @@ def test_basic_and_bearer_credentials_reach_the_endpoint(endpoint):
     assert sent == ["Basic Ym9iOnMzY3JldA==", "Bearer tok123"]
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/auth", CONSTRUCT))
-    assert str(e.value) == "endpoint 127.0.0.1/auth answered 401"
+    assert str(e.value) == f"endpoint {endpoint.where}/auth answered 401"
 
 
 @pytest.mark.parametrize("credentials", [{"auth": ("bob", "s3cret")}, {"token": "tok123"}])
@@ -117,7 +126,7 @@ def test_server_text_that_echoes_the_credentials_is_blanked(endpoint, credential
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/echo", CONSTRUCT, **credentials))
     message = str(e.value)
-    assert message.startswith("endpoint 127.0.0.1/echo answered 500: echo: ") and message.endswith("***")
+    assert message.startswith(f"endpoint {endpoint.where}/echo answered 500: echo: ") and message.endswith("***")
     assert "s3cret" not in message and "tok123" not in message and "Ym9iOnMzY3JldA" not in message
 
 
@@ -133,7 +142,7 @@ def test_an_http_error_names_the_status_and_the_first_line_of_the_body(endpoint)
     assert issubclass(sparql.FetchError, ValueError)                       # the CLI's handler catches it
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/500", CONSTRUCT))
-    assert str(e.value) == "endpoint 127.0.0.1/500 answered 500: Virtuoso 37000 Error SP030: SPARQL compiler"
+    assert str(e.value) == f"endpoint {endpoint.where}/500 answered 500: Virtuoso 37000 Error SP030: SPARQL compiler"
 
 
 @pytest.mark.parametrize(("path", "media"), [("/html", "text/html"), ("/jsonld", "application/ld+json")])
@@ -141,16 +150,16 @@ def test_a_non_rdf_or_json_ld_answer_is_refused_by_its_media_type(endpoint, path
     # JSON-LD is refused on purpose: its parser would fetch a remote @context outside fetch's rules
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + path, CONSTRUCT))
-    assert str(e.value) == f"endpoint 127.0.0.1{path} answered {media} instead of RDF"
+    assert str(e.value) == f"endpoint {endpoint.where}{path} answered {media} instead of RDF"
 
 
 def test_a_slow_endpoint_hits_the_timeout(endpoint):
-    with pytest.raises(sparql.FetchError, match=r"endpoint 127.0.0.1/slow did not answer within 0.5 s"):
+    with pytest.raises(sparql.FetchError, match=rf"endpoint {endpoint.where}/slow did not answer within 0.5 s"):
         sparql.fetch(sparql.Query(endpoint.url + "/slow", CONSTRUCT, timeout=0.5))
 
 
 def test_an_unreachable_endpoint_is_a_clean_error():
-    with pytest.raises(sparql.FetchError, match=r"cannot reach 127.0.0.1/sparql: "):
+    with pytest.raises(sparql.FetchError, match=r"cannot reach 127.0.0.1:9/sparql: "):
         sparql.fetch(sparql.Query("http://127.0.0.1:9/sparql", CONSTRUCT, timeout=5))
 
 
@@ -158,14 +167,14 @@ def test_an_unreachable_endpoint_is_a_clean_error():
 def test_a_redirect_is_refused_and_names_the_new_url_without_its_secrets(endpoint, path):
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + path, CONSTRUCT, auth=("bob", "s3cret")))
-    assert str(e.value) == f"endpoint 127.0.0.1{path} redirects to {endpoint.url}/sparql: use that URL"
+    assert str(e.value) == f"endpoint {endpoint.where}{path} redirects to {endpoint.url}/sparql: use that URL"
     assert [p for p, _, _ in endpoint.requests] == [path]     # the credentials never followed it
 
 
 def test_an_answer_over_the_limit_is_refused(endpoint):
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/big", CONSTRUCT, max_bytes=1000))
-    assert str(e.value) == ("endpoint 127.0.0.1/big answered more than 0.001 MB; "
+    assert str(e.value) == (f"endpoint {endpoint.where}/big answered more than 0.001 MB; "
                             "narrow the query or raise the limit (--max-mb, Query.max_bytes)")
     assert sparql.fetch(sparql.Query(endpoint.url + "/sparql", CONSTRUCT, max_bytes=1000))[1] == "text/turtle"
 
@@ -179,7 +188,7 @@ def test_a_huge_limit_still_reads_an_answer_without_a_content_length(endpoint, l
 
 def test_the_limit_holds_for_an_answer_without_a_content_length(endpoint):
     size = len(sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT))[0])
-    with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/nolength answered more than"):
+    with pytest.raises(sparql.FetchError, match=f"endpoint {endpoint.where}/nolength answered more than"):
         sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=size - 1))
     assert len(sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=size))[0]) == size
 
@@ -209,10 +218,23 @@ def test_an_unparsable_endpoint_keeps_no_trace_of_its_text():
     assert _chain(e.value) == [e.value]
 
 
+@pytest.mark.skipif(pyexpat.version_info < (2, 4, 1), reason="expat before 2.4.1 has no amplification limit")
+def test_an_entity_bomb_in_an_rdf_xml_answer_is_refused_in_one_line(endpoint):
+    started = time.perf_counter()
+    with pytest.raises(load.LoadError, match=r"^bomb: cannot parse as application/rdf\+xml: .*amplification"):
+        load.load([("bomb", sparql.Query(endpoint.url + "/bomb", CONSTRUCT))])
+    assert time.perf_counter() - started < 10           # --timeout does not cover the parse
+
+
+def test_an_external_entity_in_an_rdf_xml_answer_is_never_fetched(endpoint):
+    ds = load.load([("peek", sparql.Query(endpoint.url + "/peek", CONSTRUCT))])
+    assert len(ds.merged) == 1 and not any("Herbert" in str(o) for o in ds.merged.objects())
+
+
 def test_an_error_body_that_never_arrives_still_names_the_status(endpoint):
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/slow500", CONSTRUCT, timeout=0.5))
-    assert str(e.value) == "endpoint 127.0.0.1/slow500 answered 500"
+    assert str(e.value) == f"endpoint {endpoint.where}/slow500 answered 500"
 
 
 @pytest.mark.parametrize("credentials", [{"token": "tok123"}, {"auth": ("bob", "s3cret")}])
@@ -220,19 +242,19 @@ def test_a_redirect_that_echoes_the_credential_has_it_blanked(endpoint, credenti
     q = sparql.Query(endpoint.url + "/movedecho", CONSTRUCT, **credentials)
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(q)
-    redirect = f"endpoint 127.0.0.1/movedecho redirects to {endpoint.url}/***/sparql: use that URL"
+    redirect = f"endpoint {endpoint.where}/movedecho redirects to {endpoint.url}/***/sparql: use that URL"
     assert str(e.value) == redirect
     secret = credentials.get("token") or sparql._basic(credentials["auth"])
     assert not any(secret in repr(x) for x in _chain(e.value))       # not even in __context__
 
 
 def test_an_answer_cut_short_is_an_error_not_a_smaller_graph(endpoint):
-    with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/cut broke off the answer"):
+    with pytest.raises(sparql.FetchError, match=f"endpoint {endpoint.where}/cut broke off the answer"):
         sparql.fetch(sparql.Query(endpoint.url + "/cut", CONSTRUCT))
 
 
 def test_a_connection_that_closes_mid_chunk_stream_is_an_error(endpoint):
-    with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/chunkcut broke off the answer"):
+    with pytest.raises(sparql.FetchError, match=f"endpoint {endpoint.where}/chunkcut broke off the answer"):
         sparql.fetch(sparql.Query(endpoint.url + "/chunkcut", CONSTRUCT))
 
 
@@ -242,7 +264,7 @@ def test_a_request_urllib_refuses_never_echoes_the_token():
     object.__setattr__(q, "token", "tok123\n")
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(q)
-    assert str(e.value) == "cannot send the request to 127.0.0.1/sparql"
+    assert str(e.value) == "cannot send the request to 127.0.0.1:9/sparql"
     assert _chain(e.value) == [e.value]               # http.client's message quotes the header value
 
 

@@ -35,6 +35,23 @@ def tiny_nq():
     return FIXTURES / "tiny.nq"
 
 
+@pytest.fixture
+def tiny_trix():
+    return FIXTURES / "tiny.trix"
+
+
+@pytest.fixture
+def xml_bomb():
+    """RDF/XML whose one literal is an entity expanding to 3 GB."""
+    return BOMB
+
+
+@pytest.fixture
+def xml_peek():
+    """RDF/XML whose one literal is an external entity naming tests/fixtures/library.ttl."""
+    return PEEK
+
+
 @pytest.fixture(autouse=True)
 def _clean_sparql_env(monkeypatch):
     """No test should see a real credential from the developer's shell, and a local HTTP(S) proxy
@@ -52,6 +69,14 @@ JSONLD = b'[{"@id": "http://example.org/q#a", "http://example.org/q#p": [{"@id":
 TRIG = (b"@prefix ex: <http://example.org/q#> .\n"
         b"ex:g1 { ex:a ex:p ex:b . }\nex:g2 { ex:c ex:p ex:d . }\n")
 RELATIVE = b"<rel/a> <http://example.org/q#p> <rel/b> .\n"
+_RDF_XML = ('<?xml version="1.0"?>\n<!DOCTYPE rdf:RDF [{}]>\n'
+            '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:ex="http://example.org/x#">'
+            '<rdf:Description rdf:about="http://example.org/x#a"><ex:p>{}</ex:p></rdf:Description></rdf:RDF>\n')
+# ten entities, each ten of the one before: "lol" expands to 3 GB ("billion laughs")
+BOMB = _RDF_XML.format('<!ENTITY l0 "lol">' + "".join(f'<!ENTITY l{i} "{f"&l{i - 1};" * 10}">'
+                                                      for i in range(1, 10)), "&l9;").encode()
+# an external entity naming a local file: a parser that fetched it would put the file's text in the data
+PEEK = _RDF_XML.format(f'<!ENTITY peek SYSTEM "{(FIXTURES / "library.ttl").as_uri()}">', "&peek;").encode()
 ANSWERS = {                                   # path -> (status, media type or None, body)
     "/sparql": (200, "text/turtle", TURTLE),
     "/nt": (200, "application/n-triples", NT),
@@ -72,6 +97,8 @@ ANSWERS = {                                   # path -> (status, media type or N
     "/movedecho": (302, None, b""),                     # echoes the credential into the Location path
     "/nolength": (200, "text/turtle", TURTLE),          # no Content-Length: the body ends when it closes
     "/slow500": (500, "text/plain", b"too late"),       # the error body comes 1.5 s after the headers
+    "/bomb": (200, "application/rdf+xml", BOMB),
+    "/peek": (200, "application/rdf+xml", PEEK),
 }
 
 
@@ -133,10 +160,12 @@ class _QuietServer(ThreadingHTTPServer):
 
 @pytest.fixture
 def endpoint():
-    """A stub SPARQL endpoint on the loopback address: `.url` is its base, `.requests` what it saw."""
+    """A stub SPARQL endpoint on the loopback address: `.url` is its base, `.where` its host and port as
+    messages name it, `.requests` what it saw."""
     server = _QuietServer(("127.0.0.1", 0), _StubEndpoint)
     server.requests = []
     server.url = f"http://127.0.0.1:{server.server_address[1]}"
+    server.where = server.url[len("http://"):]       # how messages name it: host and port
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         yield server
