@@ -118,19 +118,19 @@ def _parsed(name: str, fmt: str, parse) -> RdfDataset:
 XML_FORMATS = frozenset({"xml", "application/rdf+xml", "trix", "application/trix"})
 
 
-def _expat_first(source: Path | bytes, fmt: str) -> None:
-    """Run an XML document through bare expat (no handlers, no external entities) before rdflib sees
-    it. On a 1 KB document whose entities nest ("billion laughs") rdflib's RDF/XML and TriX parsers
-    spend about a minute of CPU before expat's amplification limit stops them; bare expat stops in
-    milliseconds, and its ExpatError becomes the LoadError."""
+def _expat_first(source, fmt: str) -> None:
+    """Run an XML document (a file's path, or data) through bare expat (no handlers, no external
+    entities) before rdflib sees it. On a 1 KB document whose entities nest ("billion laughs")
+    rdflib's RDF/XML and TriX parsers spend about a minute of CPU before expat's amplification limit
+    stops them; bare expat stops in milliseconds, and its ExpatError becomes the LoadError. Data is
+    read as UTF-8 whatever it declares, as rdflib reads it; a file follows its declaration, as there."""
     if fmt not in XML_FORMATS:
         return
-    parser = pyexpat.ParserCreate()
-    if isinstance(source, (bytes, str)):
-        parser.Parse(source, True)
-    else:
+    if isinstance(source, os.PathLike):
         with open(source, "rb") as fh:
-            parser.ParseFile(fh)
+            pyexpat.ParserCreate().ParseFile(fh)
+    else:
+        pyexpat.ParserCreate("utf-8").Parse(source, True)
 
 
 def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
@@ -147,7 +147,8 @@ def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
     except LoadError:
         if fmt is None and guessed != "turtle":
             # Turtle reads XML markup as IRIs and rdflib logs a warning for each: hold the retry's
-            # records back, and pass them on only if the retry is the parse that counts
+            # records back, and pass them on only if the retry is the parse that counts (the filter is
+            # process-wide while it is attached: another thread's rdflib.term records meet it too)
             logger, held = logging.getLogger("rdflib.term"), _HeldBack()
             logger.addFilter(held)
             try:

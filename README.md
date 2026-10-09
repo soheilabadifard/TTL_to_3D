@@ -140,8 +140,8 @@ source.
   without a further `/` or `#` (so `urn:` vocabularies shorten too), otherwise at the
   last `/` or `#`. Legend keys, the namespace column and local names all use this one
   rule.
-- Types, edge labels and property names are local names, unless two IRIs share one: then
-  both show their prefix (FOAF types its classes `owl:Class` and `rdfs:Class`; `dc:title`
+- Types, edge labels and property names are local names, unless two of those the page shows
+  share one: then both show their prefix (FOAF types its classes `owl:Class` and `rdfs:Class`; `dc:title`
   and `dcterms:title`), or the full IRI when their namespace has no prefix.
 
 ## Slicing a big graph

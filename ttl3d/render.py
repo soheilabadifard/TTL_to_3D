@@ -184,7 +184,7 @@ __CSS__</style>
     <span id="nav"></span> · click a node for details ·
     keyboard: Tab to the legend, Enter in the search box opens the best match, Esc closes the card</div>
 </div>
-<div id="detail" role="region" aria-label="node details" aria-live="polite">
+<div id="detail" role="region" aria-label="node details">
   <button id="close" aria-label="close the card">×</button><div id="detail-body"></div></div>
 <div id="graph"></div>
 <script>__LIB__</script>

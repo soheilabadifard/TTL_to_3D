@@ -492,7 +492,7 @@ def test_the_keyboard_reaches_the_legend_the_search_matches_and_the_relations(tm
             assert page.evaluate(f"{focused}.classList.contains('active')")
             assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "true"
             assert page.evaluate("DATA.nodes.some(n => n._dim)")
-            page.keyboard.press(" ")
+            page.keyboard.press("Space")
             assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "false"
             assert not page.evaluate("DATA.nodes.some(n => n._dim)")
             page.fill("#q", "planet")         # "NASA planetary fact sheets" sorts first; the exact label wins
@@ -512,6 +512,12 @@ def test_the_keyboard_reaches_the_legend_the_search_matches_and_the_relations(tm
             page.keyboard.press("Escape")
             assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
             assert page.evaluate(f"{focused}.id") == "q"
+            page.press("#q", "Enter")                                   # the close button works by key too
+            page.keyboard.press("Shift+Tab")
+            assert page.evaluate(f"{focused}.id") == "close"
+            page.keyboard.press("Enter")
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.id") == "q"
         finally:
             browser.close()
     assert errors == []
@@ -525,8 +531,15 @@ def test_a_click_still_leaves_the_focus_where_it_was(tmp_path):
         browser, page = _open(p, out.as_uri(), errors)
         try:
             page.focus("#q")
-            page.evaluate("showNode(DATA.nodes.find(n => n.label === 'Earth'))")   # what a node click calls
+            # the handler force-graph calls on a node click, with the (node, event) it passes
+            page.evaluate("void Graph.onNodeClick()(DATA.nodes.find(n => n.label === 'Earth'), "
+                          "new MouseEvent('click'))")
+            assert page.evaluate("document.getElementById('detail').classList.contains('open')")
             assert page.evaluate("document.activeElement.id") == "q"
+            page.evaluate("document.activeElement.blur()")
+            page.click("#close")                                         # Chromium focuses a clicked button
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate("document.activeElement.id") != "q"     # the search box is not dragged in
             page.click(".row.grp")
             assert page.evaluate("document.querySelector('.row.grp').getAttribute('aria-pressed')") == "true"
             page.click("#clear")

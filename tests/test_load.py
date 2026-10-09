@@ -389,6 +389,15 @@ def test_rdf_xml_that_declares_entities_the_usual_way_still_loads(tmp_path):
                                URIRef("http://example.org/o#b"))}
 
 
+def test_in_memory_rdf_xml_still_reads_as_utf_8_whatever_it_declares_and_from_any_buffer():
+    doc = (b'<?xml version="1.0" encoding="Shift_JIS"?>\n'
+           b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"'
+           b' xmlns:ex="http://example.org/x#"><rdf:Description rdf:about="http://example.org/x#a">'
+           b'<ex:p>hi</ex:p></rdf:Description></rdf:RDF>\n')
+    assert len(load.parse_data(doc, "application/rdf+xml", "x")) == 1         # rdflib forces UTF-8 on data
+    assert len(load.parse_data(bytearray(doc), "application/rdf+xml", "x")) == 1
+
+
 def test_an_external_entity_in_an_rdf_xml_file_is_never_fetched(tmp_path, xml_peek):
     peek = tmp_path / "peek.rdf"
     peek.write_bytes(xml_peek)

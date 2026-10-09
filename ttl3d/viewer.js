@@ -122,8 +122,9 @@ function esc(s) {
 }
 
 // `byKeyboard`: the card was opened with a key, so the focus moves to its heading and Tab goes on to its
-// relations; a pointer leaves the focus where it was
-function showNode(n, byKeyboard = false) {
+// relations; a pointer leaves the focus where it was. An option, not a flag: the renderers pass
+// showNode itself as the click handler, and force-graph calls it with (node, event)
+function showNode(n, {byKeyboard = false} = {}) {
   RENDERERS[view].focus(n);
   let h = `<h2 tabindex="-1"><span class="dot" style="background:${colorOf(n)}"></span>${esc(n.label)}</h2>`;
   h += `<div class="cls">${esc(n.types.join(', ') || 'untyped')} · ${esc(n.group)}</div>`;
@@ -168,7 +169,7 @@ function showNode(n, byKeyboard = false) {
   document.getElementById('detail-body').innerHTML = h;
   document.getElementById('detail').classList.add('open');
   document.querySelectorAll('#detail .rel').forEach(el => {
-    const open = byKey => { const t = byId[el.dataset.node]; if (t) showNode(t, byKey); };
+    const open = byKeyboard => { const t = byId[el.dataset.node]; if (t) showNode(t, {byKeyboard}); };
     el.addEventListener('click', () => open(false));
     onActivate(el, () => open(true));
   });
@@ -188,15 +189,20 @@ function onActivate(el, act) {
   });
 }
 
-function closeDetail() {
+// closed by a key while the focus was in the card: the focus goes to the search box rather than
+// being lost on a hidden card; a pointer close (a background click, ×) leaves it alone
+function closeDetail({byKeyboard = false} = {}) {
   const card = document.getElementById('detail');
   const hadFocus = card.contains(document.activeElement);
   card.classList.remove('open');
-  if (hadFocus) document.getElementById('q').focus();   // not lost on a hidden card
+  if (byKeyboard && hadFocus) document.getElementById('q').focus();
 }
-document.getElementById('close').addEventListener('click', closeDetail);
+// a click with detail 0 came from Enter or Space on the focused button
+document.getElementById('close').addEventListener('click', e => closeDetail({byKeyboard: e.detail === 0}));
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('detail').classList.contains('open')) closeDetail();
+  if (e.key === 'Escape' && document.getElementById('detail').classList.contains('open')) {
+    closeDetail({byKeyboard: true});
+  }
 });
 
 // --- one shared filter: legend group selection AND label search -------------
@@ -266,9 +272,9 @@ function bestMatch() {
     .sort((a, b) => rank(a) - rank(b) || order(a.label, b.label) || order(a.id, b.id))[0];
 }
 document.getElementById('q').addEventListener('keydown', e => {
-  if (e.key !== 'Enter' || !query) return;
+  if (e.key !== 'Enter' || e.isComposing || !query) return;     // an IME's Enter confirms a word
   const n = bestMatch();
-  if (n) showNode(n, true);
+  if (n) showNode(n, {byKeyboard: true});
 });
 
 const nodeLabelBox = document.getElementById('nodelabels');

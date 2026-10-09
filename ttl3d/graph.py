@@ -93,7 +93,8 @@ def _prefix(ds: Dataset, ns: str) -> str:
 def _names(iris, prefixes) -> dict:
     """A display name per IRI: its local name, unless another IRI of the set shares that local name
     (FOAF types its classes rdfs:Class and owl:Class); then prefix:local, or the full IRI when the
-    namespace has no prefix or two namespaces share one."""
+    namespace has no prefix. Should two namespaces share a prefix, so that prefix:local still clashes,
+    every IRI with that local name shows in full."""
     by_local = defaultdict(list)
     for iri in iris:
         by_local[local(iri, prefixes)].append(iri)
@@ -162,17 +163,15 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     merged_links: dict = defaultdict(lambda: {"fwd": set(), "rev": set()})   # pair -> predicates per direction
     node_ids = set()
-    node_preds = set()            # every predicate a card or an edge label may name
     for s, p, o in g:
         if eligible(s):
             node_ids.add(s)
-            node_preds.add(p)
         if is_link(s, p, o):
             node_ids.add(o)
             a, b = sorted((s, o), key=str)
             merged_links[(a, b)]["fwd" if s == a else "rev"].add(p)
-    pred_name = _names(node_preds, prefixes)
-    type_name = _names({t for n in node_ids for t in g.objects(n, RDF.type) if isinstance(t, URIRef)}, prefixes)
+    type_name = _names({t for n in node_ids for t in g.objects(n, RDF.type)
+                        if isinstance(t, URIRef) and t != OWL.NamedIndividual}, prefixes)
 
     labels = {}
     for s in node_ids:
@@ -203,9 +202,9 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
                     continue
                 if p == def_pred and str(o) == definition:
                     continue
-                props[pred_name[p]].append(str(o))
+                props[p].append(str(o))
             elif isinstance(o, URIRef) and p in attribute and p != RDF.type and p not in SOURCE_PREDS:
-                props[pred_name[p]].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
+                props[p].append(labels.get(o) or _first(g, o, LABEL_PREDS, lang) or str(o))
         alt = sorted(({str(o) for o in g.objects(n, SKOS.altLabel)} | set(label_vals)) - {labels[n]})
         sources = [{"label": label, "url": src_url.get(s)}
                    for label, s in sorted(
@@ -219,9 +218,15 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
             "group": group_of(n, types),
             "definition": definition,
             "alt": alt,
-            "props": {k: sorted(v) for k, v in sorted(props.items())},
+            "props": props,                     # keyed by predicate IRI until every shown name is known
             "sources": sources,
         })
+
+    # only the predicates the page shows can clash: rdf:type (unless drawn) and the labels never do
+    pred_name = _names({p for d in merged_links.values() for ps in d.values() for p in ps}
+                       | {p for n in nodes for p in n["props"]}, prefixes)
+    for n in nodes:
+        n["props"] = dict(sorted((pred_name[p], sorted(v)) for p, v in n["props"].items()))
 
     links = []
     for (a, b), d in sorted(merged_links.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):

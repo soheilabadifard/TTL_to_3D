@@ -439,6 +439,28 @@ def test_the_type_legend_keeps_clashing_types_apart(tmp_path):
     assert nodes["a"]["group"] == ":Book" and nodes["b"]["group"] == "owl:Class"
 
 
+def test_a_predicate_the_page_never_shows_causes_no_prefix(tmp_path):
+    ttl = tmp_path / "dc.ttl"            # rdf:type sits on the card as a type, rdfs:label as the title
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n@prefix dcterms: <http://purl.org/dc/terms/> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   'ex:a a ex:T ; dcterms:type "Text" ; ex:label "x" ; rdfs:label "A" .\n', encoding="utf-8")
+    ds = load.load_files([ttl])
+    (node,) = [n for n in graph.build(ds)["nodes"] if n["label"] == "A"]
+    assert node["props"] == {"label": ["x"], "type": ["Text"]}
+    data = graph.build(ds, type_links=True)          # now rdf:type is an edge label beside dcterms:type
+    (node,) = [n for n in data["nodes"] if n["label"] == "A"]
+    assert node["props"] == {"dcterms:type": ["Text"], "label": ["x"]}
+    assert [l["predicates"] for l in data["links"]] == [["rdf:type"]]
+
+
+def test_two_namespaces_bound_to_one_prefix_fall_back_to_full_iris(tmp_path):
+    for name, ns in (("a", "http://a.example/#"), ("b", "http://b.example/#")):
+        (tmp_path / f"{name}.ttl").write_text(f"@prefix ex: <{ns}> .\nex:x ex:p ex:y .\n", encoding="utf-8")
+    data = graph.build(load.load_files([tmp_path / "a.ttl", tmp_path / "b.ttl"]))
+    predicates = sorted(p for l in data["links"] for p in l["predicates"])
+    assert predicates == ["http://a.example/#p", "http://b.example/#p"]
+
+
 def test_names_without_a_clash_stay_local_names(library):
     data = graph.build(load.load_files([library]))
     names = {t for n in data["nodes"] for t in n["types"]} | {p for l in data["links"] for p in l["predicates"]}

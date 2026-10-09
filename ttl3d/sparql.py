@@ -99,7 +99,7 @@ def host(endpoint: str) -> str:
 
 def netloc(url: str) -> str:
     """Host and port as the URL writes them, for messages: `h.org:8890`, `h.org` when the URL gives no
-    port; never user info. The source name keeps to `host`, since a colon cannot go in a file name."""
+    port; never user info. Source names and default file names use `host` instead."""
     return urllib.parse.urlsplit(url).netloc.rpartition("@")[2]
 
 

@@ -15,9 +15,10 @@ to the neighbours' cards, and Esc closes the card and puts the focus back in the
 search box, the card and its close button carry labels, and focused controls show a ring. A card
 opened with the pointer leaves the focus where it was.
 
-Names: a type, edge label or property whose local name another IRI shares shows as `prefix:local`
-(the full IRI when its namespace has no prefix), so FOAF's classes read `owl:Class, rdfs:Class`
-rather than `Class, Class` and `dc:title` no longer merges with `dcterms:title`. Pages without such a
+Names: a type, edge label or property whose local name another one on the page shares shows as
+`prefix:local` (the full IRI when its namespace has no prefix), so FOAF's classes read `owl:Class,
+rdfs:Class` rather than `Class, Class` and `dc:title` no longer merges with `dcterms:title`; what the
+page never names (`rdf:type` as a predicate, `rdfs:label`) clashes with nothing. Pages without such a
 clash carry the same data as before; of the demo inputs only FOAF changes.
 
 XML: rdflib's RDF/XML and TriX parsers spent about a minute of CPU on a 1 KB "billion laughs" file
