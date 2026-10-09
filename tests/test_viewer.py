@@ -45,7 +45,7 @@ def test_demo_page_runs_without_console_errors(tmp_path):
     r = subprocess.run([sys.executable, "-m", "ttl3d",
                         str(REPO / "examples" / "solar-system.ttl"),
                         str(REPO / "examples" / "solar-system-missions.ttl"), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     # the CLI prints "<nodes> nodes, <links> links -> <path> ..." on success (see tests/test_cli.py)
     n_nodes = int(r.stdout.split()[0])
@@ -80,7 +80,7 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
                    + "ex:big1 a ex:C00 . ex:big2 a ex:C00 .\n", encoding="utf-8")
     out = tmp_path / "many.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(ttl), "-o", str(out), "--color-by", "type"],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -100,7 +100,7 @@ def test_bucket_row_click_selects_only_its_groups(tmp_path):
 
 def _run_cli(*args):
     r = subprocess.run([sys.executable, "-m", "ttl3d", *args], capture_output=True, text=True, cwd=REPO,
-                       check=False)
+                       check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     return r
 
@@ -378,7 +378,7 @@ def test_view_switch_keeps_the_filter_and_pins_each_view_to_its_own_layout(tmp_p
 def test_the_card_of_a_node_from_a_named_graph_shows_the_graph_iri(tmp_path):
     out = tmp_path / "trig.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.trig"),
-                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -405,7 +405,7 @@ def test_selecting_a_re_asserting_source_keeps_its_edge_and_an_annotation_only_s
     out = tmp_path / "three.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(REPO / "tests" / "fixtures" / "library.ttl"),
                         str(tmp_path / "again.ttl"), str(tmp_path / "notes.ttl"), "-o", str(out)],
-                       capture_output=True, text=True, cwd=REPO, check=False)
+                       capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -434,7 +434,7 @@ def test_type_mode_selection_ignores_a_source_whose_name_matches_a_type(tmp_path
     shutil.copy(REPO / "tests" / "fixtures" / "library.ttl", tmp_path / "Book.ttl")
     out = tmp_path / "book.html"
     r = subprocess.run([sys.executable, "-m", "ttl3d", str(tmp_path / "Book.ttl"), "--color-by", "type",
-                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False)
+                        "-o", str(out)], capture_output=True, text=True, cwd=REPO, check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     errors = []
     with pw.sync_playwright() as p:
@@ -471,6 +471,79 @@ def test_relation_rows_name_their_sources_when_only_the_links_come_from_several(
             page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
             page.evaluate("showNode(DATA.nodes.find(n => n.label === 'a'))")
             assert "outgoing" in page.evaluate(card) and "[base]" not in page.evaluate(card)
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_the_keyboard_reaches_the_legend_the_search_matches_and_the_relations(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    focused = "document.activeElement"
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            assert page.evaluate("document.getElementById('q').getAttribute('aria-label')")
+            assert page.evaluate("document.getElementById('close').getAttribute('aria-label')")
+            page.keyboard.press("Tab")                                  # the first stop is a legend row
+            assert page.evaluate(f"{focused}.matches('.row.grp[role=button]')")
+            page.keyboard.press("Enter")
+            assert page.evaluate(f"{focused}.classList.contains('active')")
+            assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "true"
+            assert page.evaluate("DATA.nodes.some(n => n._dim)")
+            page.keyboard.press("Space")
+            assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "false"
+            assert not page.evaluate("DATA.nodes.some(n => n._dim)")
+            page.fill("#q", "planet")         # "NASA planetary fact sheets" sorts first; the exact label wins
+            page.press("#q", "Enter")
+            assert page.evaluate(f"{focused}.textContent") == "planet"
+            page.fill("#q", "earth")
+            page.press("#q", "Enter")
+            assert page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.matches('#detail h2')")
+            assert page.evaluate(f"{focused}.textContent") == "Earth"
+            page.keyboard.press("Tab")
+            assert page.evaluate(f"{focused}.matches('#detail .rel[role=button]')")
+            neighbour = page.evaluate(f"byId[{focused}.dataset.node].label")
+            page.keyboard.press("Enter")
+            assert page.evaluate(f"{focused}.matches('#detail h2')")
+            assert page.evaluate(f"{focused}.textContent") == neighbour != "Earth"
+            page.keyboard.press("Escape")
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.id") == "q"
+            page.press("#q", "Enter")                                   # the close button works by key too
+            page.keyboard.press("Shift+Tab")
+            assert page.evaluate(f"{focused}.id") == "close"
+            page.keyboard.press("Enter")
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.id") == "q"
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_a_click_still_leaves_the_focus_where_it_was(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.focus("#q")
+            # the handler force-graph calls on a node click, with the (node, event) it passes
+            page.evaluate("void Graph.onNodeClick()(DATA.nodes.find(n => n.label === 'Earth'), "
+                          "new MouseEvent('click'))")
+            assert page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate("document.activeElement.id") == "q"
+            page.evaluate("document.activeElement.blur()")
+            page.click("#close")                                         # Chromium focuses a clicked button
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate("document.activeElement.id") != "q"     # the search box is not dragged in
+            page.click(".row.grp")
+            assert page.evaluate("document.querySelector('.row.grp').getAttribute('aria-pressed')") == "true"
+            page.click("#clear")
+            assert page.evaluate("document.querySelector('.row.grp').getAttribute('aria-pressed')") == "false"
         finally:
             browser.close()
     assert errors == []

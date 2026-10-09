@@ -356,7 +356,8 @@ def test_a_source_with_several_identifier_urls_shows_the_smallest_whatever_the_h
             "data = graph.build(load.load_files([sys.argv[1]]))\n"
             "print(next(n for n in data['nodes'] if n['id'].endswith('#n'))['sources'][0]['url'])\n")
     urls = {subprocess.run([sys.executable, "-c", code, str(ttl)], capture_output=True, text=True, cwd=REPO,
-                           check=False, env={**os.environ, "PYTHONHASHSEED": seed}).stdout.strip()
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed},
+                           timeout=300).stdout.strip()
             for seed in ("1", "2", "3")}
     assert urls == {"http://a.example/one"}
 
@@ -396,3 +397,71 @@ def test_rules_decide_nodes_and_links_the_way_build_does(library):
     hidden = graph.Rules.of(ds.merged, attribute_preds=[URIRef(EX + "wrote")])
     assert URIRef(EX + "wrote") in hidden.attribute and not hidden.is_link(
         URIRef(EX + "Herbert"), URIRef(EX + "wrote"), URIRef(EX + "Dune"))
+
+
+CLASH = """@prefix ex: <http://example.org/c#> .
+@prefix foo: <http://foo.example/ns#> .
+@prefix bar: <http://bar.example/ns#> .
+@prefix : <http://default.example/ns#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+ex:a a foo:Book, bar:Book, :Book ; foo:cites ex:b ; bar:cites ex:b ; ex:knows ex:b ;
+     dc:title "Dune" ; dcterms:title "Dune (1965)" ; ex:pages 412 .
+ex:b a rdfs:Class, owl:Class ; <http://unbound.example/cites> ex:a .
+"""
+
+
+def _clash_data(tmp_path, **kw):
+    ttl = tmp_path / "clash.ttl"
+    ttl.write_text(CLASH, encoding="utf-8")
+    data = graph.build(load.load_files([ttl]), **kw)
+    return {n["id"].rsplit("#", 1)[-1]: n for n in data["nodes"]}, data["links"]
+
+
+def test_types_that_share_a_local_name_show_their_prefixes(tmp_path):
+    nodes, _ = _clash_data(tmp_path)
+    assert nodes["a"]["types"] == [":Book", "bar:Book", "foo:Book"]
+    assert nodes["b"]["types"] == ["owl:Class", "rdfs:Class"]           # FOAF types its classes both ways
+
+
+def test_predicates_that_share_a_local_name_show_their_prefixes_or_iri(tmp_path):
+    nodes, links = _clash_data(tmp_path)
+    (link,) = links
+    assert link["predicates"] == ["bar:cites", "foo:cites", "knows"]   # knows has no twin: unchanged
+    assert link["reverse"] == ["http://unbound.example/cites"]          # no prefix for its namespace
+    assert nodes["a"]["props"] == {"dc:title": ["Dune"], "dcterms:title": ["Dune (1965)"], "pages": ["412"]}
+
+
+def test_the_type_legend_keeps_clashing_types_apart(tmp_path):
+    nodes, _ = _clash_data(tmp_path, color_by="type")
+    assert nodes["a"]["group"] == ":Book" and nodes["b"]["group"] == "owl:Class"
+
+
+def test_a_predicate_the_page_never_shows_causes_no_prefix(tmp_path):
+    ttl = tmp_path / "dc.ttl"            # rdf:type sits on the card as a type, rdfs:label as the title
+    ttl.write_text("@prefix ex: <http://example.org/d#> .\n@prefix dcterms: <http://purl.org/dc/terms/> .\n"
+                   "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                   'ex:a a ex:T ; dcterms:type "Text" ; ex:label "x" ; rdfs:label "A" .\n', encoding="utf-8")
+    ds = load.load_files([ttl])
+    (node,) = [n for n in graph.build(ds)["nodes"] if n["label"] == "A"]
+    assert node["props"] == {"label": ["x"], "type": ["Text"]}
+    data = graph.build(ds, type_links=True)          # now rdf:type is an edge label beside dcterms:type
+    (node,) = [n for n in data["nodes"] if n["label"] == "A"]
+    assert node["props"] == {"dcterms:type": ["Text"], "label": ["x"]}
+    assert [l["predicates"] for l in data["links"]] == [["rdf:type"]]
+
+
+def test_two_namespaces_bound_to_one_prefix_fall_back_to_full_iris(tmp_path):
+    for name, ns in (("a", "http://a.example/#"), ("b", "http://b.example/#")):
+        (tmp_path / f"{name}.ttl").write_text(f"@prefix ex: <{ns}> .\nex:x ex:p ex:y .\n", encoding="utf-8")
+    data = graph.build(load.load_files([tmp_path / "a.ttl", tmp_path / "b.ttl"]))
+    predicates = sorted(p for l in data["links"] for p in l["predicates"])
+    assert predicates == ["http://a.example/#p", "http://b.example/#p"]
+
+
+def test_names_without_a_clash_stay_local_names(library):
+    data = graph.build(load.load_files([library]))
+    names = {t for n in data["nodes"] for t in n["types"]} | {p for l in data["links"] for p in l["predicates"]}
+    assert names and not any(":" in name for name in names)

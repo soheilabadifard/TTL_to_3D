@@ -268,5 +268,5 @@ def test_to_html_takes_a_query_and_the_api_stays_silent(endpoint, capsys):
 def test_the_fetch_notice_comes_before_the_slice_notice(endpoint):
     seen = []
     api.build_page(ttl3d.Query(endpoint.url + "/sparql", Q), focus=["ex:a"], hops=0, notice=seen.append)
-    assert seen[0].startswith("fetched 2 triples from 127.0.0.1 in ")
+    assert seen[0].startswith(f"fetched 2 triples from {endpoint.where} in ")
     assert seen[1] == "kept 1 of 2 nodes (focus ex:a, 0 hops)"

@@ -131,7 +131,7 @@ def test_layout_is_identical_across_processes_with_different_hash_seeds(dim):
     outs = []
     for seed in ("1", "2"):
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO,
-                           check=False, env={**os.environ, "PYTHONHASHSEED": seed})
+                           check=False, env={**os.environ, "PYTHONHASHSEED": seed}, timeout=300)
         assert r.returncode == 0, r.stderr
         outs.append(r.stdout)
     assert outs[0] == outs[1]

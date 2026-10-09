@@ -46,6 +46,9 @@
   #detail td:first-child { color:#6b7280; white-space:nowrap; }
   #detail .rel { cursor:pointer; border-radius:5px; padding:1px 5px; margin-left:-5px; }
   #detail .rel:hover { background:#eef1f6; }
+  .row.grp:focus-visible, #detail .rel:focus-visible, #close:focus-visible, #q:focus-visible {
+    outline:2px solid #2563eb; outline-offset:1px; }
+  #detail h2:focus { outline:none; }                     /* a target for the focus, not a control */
   #detail .rel .pred { color:#6b7280; }
   #detail .rel b { font-weight:600; }
   #detail .src { margin:1px 0; }

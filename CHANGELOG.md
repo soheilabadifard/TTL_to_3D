@@ -4,6 +4,38 @@
 
 Nothing yet.
 
+## 0.8.0 (2026-10-09)
+
+The rest of the September review: the design items it left open.
+
+Keyboard and screen readers: Tab reaches the legend rows, which toggle with Enter or Space and say
+whether they are pressed; Enter in the search box opens the card of the best match among the lit
+nodes (the exact label, then labels starting with the text); Tab and Enter walk the card's relations
+to the neighbours' cards, and Esc closes the card and puts the focus back in the search box. The
+search box, the card and its close button carry labels, and focused controls show a ring. A card
+opened with the pointer leaves the focus where it was.
+
+Names: a type, edge label or property whose local name another one on the page shares shows as
+`prefix:local` (the full IRI when its namespace has no prefix), so FOAF's classes read `owl:Class,
+rdfs:Class` rather than `Class, Class` and `dc:title` no longer merges with `dcterms:title`; what the
+page never names (`rdf:type` as a predicate, `rdfs:label`) clashes with nothing. Pages without such a
+clash carry the same data as before; of the demo inputs only FOAF changes.
+
+XML: rdflib's RDF/XML and TriX parsers spent about a minute of CPU on a 1 KB "billion laughs" file
+or SPARQL answer before expat's own limit stopped them. Every XML input now passes through bare expat
+first, which refuses it in milliseconds at about 1% of a normal load; external entities were and are
+never fetched.
+
+Errors: running out of memory is one line (`out of memory while building the page; ...`) instead of a
+traceback, and no longer passes for a syntax error. A file whose guessed parser fails no longer
+prints rdflib's "does not look like a valid URI" lines from the Turtle retry before its error.
+Endpoint messages and the fetch line name the port when the endpoint's URL gives one
+(`endpoint h.org:8890/sparql answered 500`); source names stay the bare host.
+
+Tests: a TriX fixture loads like its N-Quads twin on rdflib 7.0 and 7.6; a sliced run picks its
+layout from the slice and announces the slice before the stress layout; every test subprocess has a
+timeout.
+
 ## 0.7.2 (2026-10-09)
 
 Fixes from three code reviews. A page that built before carries the same data; only the card's

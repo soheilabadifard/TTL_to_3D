@@ -163,6 +163,9 @@ def main(argv: list[str] | None = None) -> int:
             schema=args.schema, notice=lambda message: print(message, file=sys.stderr))
     except (OSError, ValueError) as e:      # LoadError is a ValueError; an unknown prefix too
         return _fail(e)
+    except MemoryError:
+        return _fail("out of memory while building the page; try a smaller input or, for a query, "
+                     "a narrower query or a lower --max-mb")
     try:
         render.write_html(built.html, out)
     except OSError as e:

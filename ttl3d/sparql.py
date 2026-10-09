@@ -88,18 +88,24 @@ def prefixes_in(query: str) -> dict[str, str]:
 
 
 def host(endpoint: str) -> str:
-    """The endpoint's hostname, for source names and messages; the endpoint itself when it has none
-    or cannot be split (an unclosed [IPv6] bracket: building the Query then names the problem)."""
+    """The endpoint's hostname, for source names and default file names (messages use `netloc`); the
+    endpoint itself when it has none or cannot be split (an unclosed [IPv6] bracket: building the
+    Query then names the problem)."""
     try:
         return urllib.parse.urlsplit(endpoint).hostname or endpoint
     except ValueError:
         return endpoint
 
 
+def netloc(url: str) -> str:
+    """Host and port as the URL writes them, for messages: `h.org:8890`, `h.org` when the URL gives no
+    port; never user info. Source names and default file names use `host` instead."""
+    return urllib.parse.urlsplit(url).netloc.rpartition("@")[2]
+
+
 def _where(url: str) -> str:
-    """Host and path, for messages: never user info, a query string or a fragment."""
-    parts = urllib.parse.urlsplit(url)
-    return (parts.hostname or "") + parts.path
+    """Host, port and path, for messages: never user info, a query string or a fragment."""
+    return netloc(url) + urllib.parse.urlsplit(url).path
 
 
 def _clean(url: str) -> str:

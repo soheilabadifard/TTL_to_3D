@@ -135,7 +135,8 @@ def test_viewer_js_is_valid_javascript(tmp_path):
         js = js.replace(key, "{}")
     probe = tmp_path / "viewer-probe.js"
     probe.write_text(js, encoding="utf-8")
-    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True, check=False)
+    r = subprocess.run(["node", "--check", str(probe)], capture_output=True, text=True, check=False,
+                       timeout=300)
     assert r.returncode == 0, r.stderr
 
 
@@ -172,7 +173,7 @@ def test_write_html_is_utf8_even_under_an_ascii_locale(tmp_path):
             f"render.write_html('<title>B\\u00fccher</title>', {str(out)!r})")
     env = {**os.environ, "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0", "LC_ALL": "C", "LANG": "C"}
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=REPO,
-                       check=False)
+                       check=False, timeout=300)
     assert r.returncode == 0, r.stderr
     assert out.read_bytes() == "<title>Bücher</title>".encode()
 
@@ -255,7 +256,7 @@ def test_named_graph_iris_reach_the_page_and_title_their_legend_rows(library_tri
     page = render.render_html(trig, title="t", pinned=False, labels={"node": True, "edge": True})
     assert '"graphs": {' in page and "graphs/catalogue" in page                   # DATA.graphs
     assert 'data-group=":catalogue" title="http://example.org/graphs/catalogue"' in page
-    assert 'data-group="library"><span' in page                                    # a file key: no title
+    assert f'data-group="library"{render.BUTTON}><span' in page                       # a file key: no title
 
 
 def test_the_card_shows_the_graph_iri_under_the_source_key():
@@ -281,7 +282,7 @@ def test_an_annotation_only_source_gets_a_muted_legend_row_that_explains_itself(
     page = render.render_html(data, title="t", pinned=False, labels={"node": True, "edge": True})
     assert ('class="row grp annot" data-group="notes" '
             'title="declares no node and asserts no edge; what it adds shows on the cards"') in page
-    assert 'class="row grp" data-group="library"><span' in page
+    assert f'class="row grp" data-group="library"{render.BUTTON}><span' in page
 
 
 def test_the_filter_keeps_the_edges_every_selected_source_asserts():

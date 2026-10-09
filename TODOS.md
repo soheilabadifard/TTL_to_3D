@@ -21,6 +21,10 @@
      proxies accept only GET. It bends 0.7.0's one-attempt rule and puts the query into a URL (length
      limits, server logs), so add it when an endpoint someone uses needs it.
 
+- **Small:** an IPv6 endpoint (`--endpoint http://[::1]:8890/sparql`) names its source, and so the
+  default output file, `::1`; Windows refuses a colon in a file name. Replace the colons in the source
+  name (the legend row) or only in the default file name. Found in the 0.8.0 review.
+
 ## Completed
 
 - SPARQL endpoint input (`--endpoint`/`--query`, `ttl3d.Query`), item 1 of the 2026-09-11 input list:
