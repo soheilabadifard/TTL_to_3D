@@ -261,10 +261,10 @@ def load(sources: Sources, fmt: str | None = None, *,
             default, named_graphs = obj, {}
         elif isinstance(obj, (str, os.PathLike)):
             f = Path(obj)
-            if f.is_dir():
-                raise IsADirectoryError(f"{f} is a directory, not a file")
             if not f.is_file():
-                raise FileNotFoundError(f"{f} is not a regular file" if f.exists() else f"{f}: no such file")
+                problem = (f"{f} is a directory, not a file" if f.is_dir() else
+                           f"{f} is not a regular file" if f.exists() else f"{f}: no such file")
+                raise FileNotFoundError(problem)
             rds = _parse(f, fmt)
             key, bound = name or f.stem, rds
             default, named_graphs = _split(rds)
@@ -301,4 +301,4 @@ def load(sources: Sources, fmt: str | None = None, *,
 def load_files(paths: Iterable[str | Path], fmt: str | None = None) -> Dataset:
     """Paths only; the original entry point, kept as an alias of `load`. `list()` first so a
     tuple of paths stays several sources, not one `(name, path)` pair."""
-    return load(list(paths), fmt)
+    return load(paths if isinstance(paths, (set, frozenset)) else list(paths), fmt)   # a set: refused

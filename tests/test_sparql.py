@@ -9,6 +9,15 @@ from ttl3d import load, sparql
 CONSTRUCT = "PREFIX ex: <http://example.org/q#> CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }"
 
 
+def _chain(e):
+    """Every exception reachable from `e` through __cause__ and __context__, `e` first."""
+    seen = []
+    while e is not None and e not in seen:
+        seen.append(e)
+        e = e.__cause__ or e.__context__
+    return seen
+
+
 def test_form_reads_the_first_word_after_the_prologue():
     assert sparql.form("CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }") == "CONSTRUCT"
     assert sparql.form("describe <http://example.org/x>") == "DESCRIBE"
@@ -175,6 +184,31 @@ def test_the_limit_holds_for_an_answer_without_a_content_length(endpoint):
     assert len(sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=size))[0]) == size
 
 
+@pytest.mark.parametrize("path", ["/big", "/nolength", "/chunkcut", "/cut"])
+def test_an_answer_read_in_many_chunks_keeps_every_refusal(endpoint, monkeypatch, path):
+    url = endpoint.url + path
+    if path in ("/big", "/nolength"):
+        size = len(sparql.fetch(sparql.Query(url, CONSTRUCT))[0])
+    monkeypatch.setattr(sparql, "CHUNK", 7)                     # every stub answer spans several reads
+    if path == "/chunkcut":
+        with pytest.raises(sparql.FetchError, match="broke off the answer"):
+            sparql.fetch(sparql.Query(url, CONSTRUCT))
+    elif path == "/cut":
+        with pytest.raises(sparql.FetchError, match="broke off the answer after 10 bytes"):
+            sparql.fetch(sparql.Query(url, CONSTRUCT))
+    else:
+        assert len(sparql.fetch(sparql.Query(url, CONSTRUCT, max_bytes=size))[0]) == size
+        with pytest.raises(sparql.FetchError, match="answered more than"):
+            sparql.fetch(sparql.Query(url, CONSTRUCT, max_bytes=size - 1))
+
+
+def test_an_unparsable_endpoint_keeps_no_trace_of_its_text():
+    with pytest.raises(ValueError) as e:
+        sparql.Query("http://bob:s3cret@[bad/sparql", CONSTRUCT)
+    assert str(e.value) == "the endpoint is not a well-formed URL"
+    assert _chain(e.value) == [e.value]
+
+
 def test_an_error_body_that_never_arrives_still_names_the_status(endpoint):
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(sparql.Query(endpoint.url + "/slow500", CONSTRUCT, timeout=0.5))
@@ -188,6 +222,8 @@ def test_a_redirect_that_echoes_the_credential_has_it_blanked(endpoint, credenti
         sparql.fetch(q)
     redirect = f"endpoint 127.0.0.1/movedecho redirects to {endpoint.url}/***/sparql: use that URL"
     assert str(e.value) == redirect
+    secret = credentials.get("token") or sparql._basic(credentials["auth"])
+    assert not any(secret in repr(x) for x in _chain(e.value))       # not even in __context__
 
 
 def test_an_answer_cut_short_is_an_error_not_a_smaller_graph(endpoint):
@@ -207,8 +243,7 @@ def test_a_request_urllib_refuses_never_echoes_the_token():
     with pytest.raises(sparql.FetchError) as e:
         sparql.fetch(q)
     assert str(e.value) == "cannot send the request to 127.0.0.1/sparql"
-    assert "tok123" not in repr(e.value)
-    assert e.value.__cause__ is None
+    assert _chain(e.value) == [e.value]               # http.client's message quotes the header value
 
 
 def test_a_byte_order_mark_before_the_query_is_skipped_like_whitespace():

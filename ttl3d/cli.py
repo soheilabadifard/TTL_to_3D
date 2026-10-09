@@ -114,9 +114,11 @@ def main(argv: list[str] | None = None) -> int:
         return _fail("at least one file or --query is needed")
     if args.query:
         size = args.max_mb * 1_000_000                       # a float: 1e308 MB overflows to inf here
-        max_bytes = int(size) if math.isfinite(size) else 0
-        if max_bytes < 1:
+        if not size >= 1:                                   # nan too
             return _fail("--max-mb must be a positive number of megabytes")
+        if math.isinf(size):
+            return _fail("--max-mb is too large")
+        max_bytes = int(size)
         user, token = _secret("TTL3D_SPARQL_USER"), _secret("TTL3D_SPARQL_TOKEN")
         if user and token:
             return _fail("set either TTL3D_SPARQL_TOKEN or TTL3D_SPARQL_USER, not both")

@@ -131,8 +131,10 @@ class Query:
             raise ValueError("the endpoint URL must not contain spaces or line breaks")
         try:
             parts = urllib.parse.urlsplit(self.endpoint)
-        except ValueError:                    # its message may quote the netloc, user info included
-            raise ValueError("the endpoint is not a well-formed URL") from None
+        except ValueError:                    # its message may quote the netloc, user info included,
+            parts = None                      # so raise outside the handler: not even __context__ keeps it
+        if parts is None:
+            raise ValueError("the endpoint is not a well-formed URL")
         try:
             _ = parts.port
         except ValueError:
@@ -221,6 +223,7 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
     req = urllib.request.Request(q.endpoint, data=urllib.parse.urlencode({"query": q.query}).encode(),
                                  headers=headers, method="POST")
     where = _where(q.endpoint)
+    unsent = None
     try:
         with _OPENER.open(req, timeout=q.timeout) as resp:
             body = _read_at_most(resp, q.max_bytes + 1)
@@ -247,11 +250,15 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
     except (OSError, http.client.HTTPException) as e:       # a connection that broke off mid-answer
         raise FetchError(f"endpoint {where} broke off the answer: {e}") from e
     except ValueError as e:
-        if isinstance(e, FetchError):        # the redirect refusal names a server-sent URL: scrub it too
-            raise FetchError(_scrub(str(e), q)) from None
+        if isinstance(e, FetchError):        # the redirect refusal names a server-sent URL: scrub it in place
+            e.args = (_scrub(str(e), q),)
+            raise
         # http.client can raise ValueError with the header value in its message (e.g. a token or
-        # password containing a stray newline): never let that reach the caller
-        raise FetchError(f"cannot send the request to {where}") from None
+        # password containing a stray newline): raised below, outside this handler, so that not even
+        # the new error's __context__ keeps it
+        unsent = FetchError(f"cannot send the request to {where}")
+    if unsent:
+        raise unsent
     if len(body) > q.max_bytes:
         raise FetchError(f"endpoint {where} answered more than {q.max_bytes / 1e6:g} MB; "
                          "narrow the query or raise the limit (--max-mb, Query.max_bytes)")

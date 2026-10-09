@@ -451,8 +451,8 @@ ENDPOINT = ["--endpoint", "http://127.0.0.1:9/sparql", "--query", "CONSTRUCT {} 
     ([*ENDPOINT, "--timeout", "0"], "timeout must be a positive number of seconds, got 0.0"),
     ([*ENDPOINT, "--timeout", "inf"], "timeout must be a positive number of seconds, got inf"),
     ([*ENDPOINT, "--max-mb", "0"], "--max-mb must be a positive number of megabytes"),
-    ([*ENDPOINT, "--max-mb", "1e308"], "--max-mb must be a positive number of megabytes"),  # bytes overflow
-    ([*ENDPOINT, "--max-mb", "inf"], "--max-mb must be a positive number of megabytes"),
+    ([*ENDPOINT, "--max-mb", "1e308"], "--max-mb is too large"),        # its byte count overflows a float
+    ([*ENDPOINT, "--max-mb", "inf"], "--max-mb is too large"),
     ([*ENDPOINT, "--max-mb", "nan"], "--max-mb must be a positive number of megabytes"),
     (["--endpoint", "http://[bad", "--query", "CONSTRUCT {} WHERE {}"],
      "the endpoint is not a well-formed URL"),

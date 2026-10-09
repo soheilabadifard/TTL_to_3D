@@ -39,7 +39,7 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
-_NOT_IN_IRI = re.compile(r'[\s<>"{}|\\^`]')   # what rdflib's URIRef logs a warning for, and all whitespace
+_NOT_IN_IRI = re.compile(r'[\x00-\x20<>"{}|\\^`]')   # what Turtle's IRIREF excludes; rdflib logs about most
 
 
 @dataclass(frozen=True)

@@ -47,7 +47,7 @@ def test_missing_file_raises(tmp_path):
 
 
 def test_a_path_that_is_not_a_regular_file_says_what_it_is(tmp_path):
-    with pytest.raises(IsADirectoryError, match="is a directory, not a file$"):
+    with pytest.raises(FileNotFoundError, match="is a directory, not a file$"):   # the type 0.7.1 raised
         load.load_files([tmp_path])
     if hasattr(os, "mkfifo"):                         # a named pipe exists but is not a file to parse
         os.mkfifo(tmp_path / "pipe")
@@ -59,6 +59,8 @@ def test_a_path_that_is_not_a_regular_file_says_what_it_is(tmp_path):
 def test_a_set_of_sources_is_refused_because_it_has_no_order(library, library_extra, kind):
     with pytest.raises(TypeError, match="a set of sources has no order; pass a list"):
         load.load(kind([library, library_extra]))
+    with pytest.raises(TypeError, match="a set of sources has no order; pass a list"):
+        load.load_files(kind([library, library_extra]))
 
 
 def test_namespace_prefixes_collected(library):
