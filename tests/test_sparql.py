@@ -1,4 +1,5 @@
 """ttl3d.sparql: a CONSTRUCT or DESCRIBE result fetched from a SPARQL endpoint."""
+import sys
 import urllib.parse
 
 import pytest
@@ -49,6 +50,7 @@ def test_prefixes_come_from_the_prologue_only_resolved_against_base():
 def test_host_is_the_hostname_without_user_info_or_the_endpoint_itself():
     assert sparql.host("https://user:pw@query.wikidata.org/sparql") == "query.wikidata.org"
     assert sparql.host("not a url") == "not a url"
+    assert sparql.host("http://[bad") == "http://[bad"                # urlsplit refuses it; no traceback
 
 
 @pytest.mark.parametrize(("change", "message"), [
@@ -56,6 +58,7 @@ def test_host_is_the_hostname_without_user_info_or_the_endpoint_itself():
     ({"endpoint": "https://bob:s3cret@h.org/sparql"}, "the endpoint URL must not carry credentials"),
     ({"endpoint": "https://h.org/spar ql"}, "must not contain spaces or line breaks"),
     ({"endpoint": "https://h.org:abc/sparql"}, "invalid port"),
+    ({"endpoint": "http://[bad"}, "the endpoint is not a well-formed URL"),
     ({"auth": "bob:pw"}, "auth is a"),
     ({"auth": ("bob", "pw"), "token": "tok"}, "give either auth or token, not both"),
     ({"token": "tok123\n"}, "the token must be a non-empty string of printable ASCII"),
@@ -156,6 +159,35 @@ def test_an_answer_over_the_limit_is_refused(endpoint):
     assert str(e.value) == ("endpoint 127.0.0.1/big answered more than 0.001 MB; "
                             "narrow the query or raise the limit (--max-mb, Query.max_bytes)")
     assert sparql.fetch(sparql.Query(endpoint.url + "/sparql", CONSTRUCT, max_bytes=1000))[1] == "text/turtle"
+
+
+@pytest.mark.parametrize("limit", [10**12, sys.maxsize, 10**30])
+def test_a_huge_limit_still_reads_an_answer_without_a_content_length(endpoint, limit):
+    # read(limit) would size its buffer by the limit: EINVAL for 1 TB, OverflowError past sys.maxsize
+    expected = sparql.fetch(sparql.Query(endpoint.url + "/sparql", CONSTRUCT))         # the same Turtle
+    assert sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=limit)) == expected
+
+
+def test_the_limit_holds_for_an_answer_without_a_content_length(endpoint):
+    size = len(sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT))[0])
+    with pytest.raises(sparql.FetchError, match="endpoint 127.0.0.1/nolength answered more than"):
+        sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=size - 1))
+    assert len(sparql.fetch(sparql.Query(endpoint.url + "/nolength", CONSTRUCT, max_bytes=size))[0]) == size
+
+
+def test_an_error_body_that_never_arrives_still_names_the_status(endpoint):
+    with pytest.raises(sparql.FetchError) as e:
+        sparql.fetch(sparql.Query(endpoint.url + "/slow500", CONSTRUCT, timeout=0.5))
+    assert str(e.value) == "endpoint 127.0.0.1/slow500 answered 500"
+
+
+@pytest.mark.parametrize("credentials", [{"token": "tok123"}, {"auth": ("bob", "s3cret")}])
+def test_a_redirect_that_echoes_the_credential_has_it_blanked(endpoint, credentials):
+    q = sparql.Query(endpoint.url + "/movedecho", CONSTRUCT, **credentials)
+    with pytest.raises(sparql.FetchError) as e:
+        sparql.fetch(q)
+    redirect = f"endpoint 127.0.0.1/movedecho redirects to {endpoint.url}/***/sparql: use that URL"
+    assert str(e.value) == redirect
 
 
 def test_an_answer_cut_short_is_an_error_not_a_smaller_graph(endpoint):

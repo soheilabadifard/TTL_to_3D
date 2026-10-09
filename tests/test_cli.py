@@ -67,8 +67,14 @@ def test_cli_missing_file_is_a_clean_error(tmp_path, capsys):
     out = tmp_path / "x.html"
     rc = cli.main([str(tmp_path / "nope.ttl"), "-o", str(out)])
     assert rc == 1
-    err = capsys.readouterr().err
-    assert err.startswith("ttl3d: error:") and "nope.ttl" in err
+    assert capsys.readouterr().err == f"ttl3d: error: {tmp_path / 'nope.ttl'}: no such file\n"
+    assert not out.exists()
+
+
+def test_cli_directory_input_says_it_is_a_directory(tmp_path, capsys):
+    out = tmp_path / "x.html"
+    assert cli.main([str(tmp_path), "-o", str(out)]) == 1
+    assert capsys.readouterr().err == f"ttl3d: error: {tmp_path} is a directory, not a file\n"
     assert not out.exists()
 
 
@@ -294,9 +300,21 @@ def test_focus_and_schema_slice_the_page_and_announce_it(tmp_path, library, libr
 
 def test_an_empty_focus_is_an_error(tmp_path, library, capsys):
     out = tmp_path / "s.html"
-    assert cli.main([str(library), "--focus", ",", "-o", str(out)]) == 1
-    assert capsys.readouterr().err == "ttl3d: error: --focus is empty\n"
+    for empty in (",", " , "):
+        assert cli.main([str(library), "--focus", empty, "-o", str(out)]) == 1
+        assert capsys.readouterr().err == "ttl3d: error: --focus is empty\n"
     assert not out.exists()
+
+
+def test_terms_may_have_spaces_around_their_commas(tmp_path, library, library_extra, capsys):
+    both = [str(library), str(library_extra)]
+    spaced, tight = tmp_path / "spaced.html", tmp_path / "tight.html"
+    assert cli.main([*both, "--focus", "ex:Dune, ex:Asimov", "--attribute-preds", " ex:wrote , rdfs:label",
+                     "-o", str(spaced)]) == 0
+    assert cli.main([*both, "--focus", "ex:Dune,ex:Asimov", "--attribute-preds", "ex:wrote,rdfs:label",
+                     "-o", str(tight)]) == 0
+    capsys.readouterr()
+    assert spaced.read_bytes() == tight.read_bytes()
 
 
 def test_hops_needs_focus_and_bad_focus_or_hops_are_one_line_errors(tmp_path, library, capsys):
@@ -433,6 +451,11 @@ ENDPOINT = ["--endpoint", "http://127.0.0.1:9/sparql", "--query", "CONSTRUCT {} 
     ([*ENDPOINT, "--timeout", "0"], "timeout must be a positive number of seconds, got 0.0"),
     ([*ENDPOINT, "--timeout", "inf"], "timeout must be a positive number of seconds, got inf"),
     ([*ENDPOINT, "--max-mb", "0"], "--max-mb must be a positive number of megabytes"),
+    ([*ENDPOINT, "--max-mb", "1e308"], "--max-mb must be a positive number of megabytes"),  # bytes overflow
+    ([*ENDPOINT, "--max-mb", "inf"], "--max-mb must be a positive number of megabytes"),
+    ([*ENDPOINT, "--max-mb", "nan"], "--max-mb must be a positive number of megabytes"),
+    (["--endpoint", "http://[bad", "--query", "CONSTRUCT {} WHERE {}"],
+     "the endpoint is not a well-formed URL"),
     (["--endpoint", "https://bob:pw@127.0.0.1:9/sparql", "--query", "CONSTRUCT {} WHERE {}"],
      ("the endpoint URL must not carry credentials; use TTL3D_SPARQL_USER and TTL3D_SPARQL_PASSWORD or "
       "TTL3D_SPARQL_TOKEN (auth= or token= in Python)")),

@@ -191,9 +191,12 @@ _NOT_A_SOURCE = (
 def _items(sources) -> list:
     """One source or an iterable of sources, as a list. A str, a path, a Graph, a Query or a tuple is one
     source: a tuple is always a (name, item) pair, never two sources; several go in a list. A
-    mapping names its values: {"planets": g} is the same as [("planets", g)]."""
+    mapping names its values: {"planets": g} is the same as [("planets", g)]. A set is refused: the
+    order of the sources names the page and orders the legend, and a set's order follows the hash seed."""
     if isinstance(sources, Mapping):
         return list(sources.items())
+    if isinstance(sources, (set, frozenset)):
+        raise TypeError("a set of sources has no order; pass a list")
     if isinstance(sources, (str, os.PathLike, Graph, tuple, sparql.Query)):
         return [sources]
     try:
@@ -258,8 +261,10 @@ def load(sources: Sources, fmt: str | None = None, *,
             default, named_graphs = obj, {}
         elif isinstance(obj, (str, os.PathLike)):
             f = Path(obj)
+            if f.is_dir():
+                raise IsADirectoryError(f"{f} is a directory, not a file")
             if not f.is_file():
-                raise FileNotFoundError(f)
+                raise FileNotFoundError(f"{f} is not a regular file" if f.exists() else f"{f}: no such file")
             rds = _parse(f, fmt)
             key, bound = name or f.stem, rds
             default, named_graphs = _split(rds)

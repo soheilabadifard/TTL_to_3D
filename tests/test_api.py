@@ -163,7 +163,9 @@ def test_the_iframe_escapes_a_page_that_could_break_out_of_the_attribute(library
 
 def test_page_repr_is_short_and_write_writes_the_html(tmp_path, library):
     page = ttl3d.show(library)
-    assert repr(page) == f"Page({len(page.html)} bytes, height=600)"
+    size = len(page.html.encode("utf-8"))
+    assert size > len(page.html)                       # the fixture's labels are not all ASCII
+    assert repr(page) == f"Page({size} bytes, height=600)"
     out = page.write(tmp_path / "lib.html")
     assert out.read_text(encoding="utf-8") == page.html
 
@@ -231,6 +233,15 @@ def test_hops_without_a_focus_is_ignored_and_an_unknown_focus_is_named(library):
         ttl3d.to_html(library, focus=["ex:Nope"])
     with pytest.raises(ValueError, match="unknown prefix"):
         ttl3d.to_html(library, focus=["nope:Dune"])
+
+
+def test_a_term_that_cannot_be_an_iri_is_an_error_and_nothing_is_logged(library, caplog):
+    caplog.clear()
+    with pytest.raises(ValueError, match="'ex:Dune, ex:Asimov' cannot be an IRI"):
+        ttl3d.to_html(library, focus=["ex:Dune, ex:Asimov"])
+    with pytest.raises(ValueError, match="an empty term"):
+        ttl3d.to_html(library, attribute_preds=[""])
+    assert caplog.records == []
 
 
 def test_build_page_reports_the_slice_through_notice_and_the_api_stays_silent(library, library_extra, capsys):

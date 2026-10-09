@@ -42,8 +42,23 @@ def test_same_stem_in_two_directories_gets_distinct_keys(tmp_path, library):
 
 
 def test_missing_file_raises(tmp_path):
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match="nope.ttl: no such file$"):
         load.load_files([tmp_path / "nope.ttl"])
+
+
+def test_a_path_that_is_not_a_regular_file_says_what_it_is(tmp_path):
+    with pytest.raises(IsADirectoryError, match="is a directory, not a file$"):
+        load.load_files([tmp_path])
+    if hasattr(os, "mkfifo"):                         # a named pipe exists but is not a file to parse
+        os.mkfifo(tmp_path / "pipe")
+        with pytest.raises(FileNotFoundError, match="pipe is not a regular file$"):
+            load.load_files([tmp_path / "pipe"])
+
+
+@pytest.mark.parametrize("kind", [set, frozenset])
+def test_a_set_of_sources_is_refused_because_it_has_no_order(library, library_extra, kind):
+    with pytest.raises(TypeError, match="a set of sources has no order; pass a list"):
+        load.load(kind([library, library_extra]))
 
 
 def test_namespace_prefixes_collected(library):

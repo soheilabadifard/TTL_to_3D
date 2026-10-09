@@ -87,6 +87,11 @@ def _query_text(text: str) -> str:
         raise ValueError(f"{path}: the query file is not UTF-8 text") from None
 
 
+def _terms(args: list[str]) -> list[str]:
+    """Comma-separated terms from every use of an option; "a, b" is two terms, an empty one is none."""
+    return [term for arg in args for term in (t.strip() for t in arg.split(",")) if term]
+
+
 def _secret(name: str) -> str | None:
     """An environment variable with a trailing line break stripped: a secrets file or pasted value
     often ends with one. Spaces are kept; a token or password might genuinely have them."""
@@ -108,7 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.files and not args.query:
         return _fail("at least one file or --query is needed")
     if args.query:
-        max_bytes = int(args.max_mb * 1_000_000) if math.isfinite(args.max_mb) else 0
+        size = args.max_mb * 1_000_000                       # a float: 1e308 MB overflows to inf here
+        max_bytes = int(size) if math.isfinite(size) else 0
         if max_bytes < 1:
             return _fail("--max-mb must be a positive number of megabytes")
         user, token = _secret("TTL3D_SPARQL_USER"), _secret("TTL3D_SPARQL_TOKEN")
@@ -129,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"output {out} is also an input file; pick another -o path")
     if args.hops is not None and not args.focus:
         return _fail("--hops needs --focus")
-    focus = [t for arg in args.focus for t in arg.split(",") if t]
+    focus = _terms(args.focus)
     if args.focus and not focus:
         return _fail("--focus is empty")
     hops = 1 if args.hops is None else args.hops
@@ -149,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             sources, title=args.title or None,          # --title "" meant "the first stem" before; keep it
             color_by=args.color_by, layout=args.layout, labels=args.labels,
             view=args.view, lang=args.lang, type_links=args.type_links,
-            attribute_preds=[t for arg in args.attribute_preds for t in arg.split(",") if t],
+            attribute_preds=_terms(args.attribute_preds),
             fmt=args.format,
             focus=focus or None, hops=hops,
             schema=args.schema, notice=lambda message: print(message, file=sys.stderr))

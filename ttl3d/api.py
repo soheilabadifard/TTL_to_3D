@@ -153,7 +153,7 @@ class Page:
         return _render.write_html(self.html, out)
 
     def __repr__(self) -> str:      # never dump 1.9 MB into a terminal
-        return f"Page({len(self.html)} bytes, height={self.height})"
+        return f"Page({len(self.html.encode('utf-8'))} bytes, height={self.height})"
 
 
 def show(sources: Sources, *, height: int = 600, **options: Any) -> Page:
