@@ -19,6 +19,14 @@ def test_coordinates_are_masked_and_collected_in_order_while_string_values_stay(
     assert '"x": "not a coordinate"' in masked and '"y2": "1.5 kg"' in masked
 
 
+def test_a_numeric_property_named_like_a_coordinate_is_content_not_drift():
+    page = PAGE.replace('"x": "not a coordinate", "y2": "1.5 kg"', '"x": 412')
+    masked, coords = compare_pages.strip_coordinates(page)
+    assert coords == [-1.5, 2.25, 0.0, 3.0, -4.0] and '"props": {"x": 412}' in masked
+    ok, note = compare_pages.compare(page, page.replace('"x": 412', '"x": 412.5'))
+    assert not ok and note.startswith("differs beyond coordinates")
+
+
 def test_identical_pages_compare_equal():
     ok, note = compare_pages.compare(PAGE, PAGE)
     assert ok and note == "identical"
@@ -53,3 +61,13 @@ def test_main_compares_every_page_of_the_first_directory_against_the_others(tmp_
     assert compare_pages.main([str(d) for d in dirs]) == 1
     out = capsys.readouterr().out
     assert "solar-force.html" in out and "mac" in out
+    (dirs[1] / "solar-3d.html").unlink()
+    assert compare_pages.main([str(d) for d in dirs]) == 1
+    assert "solar-3d.html: missing in windows" in capsys.readouterr().out
+
+
+def test_main_needs_two_existing_directories(tmp_path, capsys):
+    assert compare_pages.main([]) == 2 and compare_pages.main([str(tmp_path)]) == 2
+    assert capsys.readouterr().err.count("usage: python tools/compare_pages.py <dir> <dir> [<dir> ...]") == 2
+    assert compare_pages.main([str(tmp_path), str(tmp_path / "nope")]) == 2
+    assert capsys.readouterr().err == f"{tmp_path / 'nope'} is not a directory\n"
