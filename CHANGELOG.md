@@ -4,6 +4,28 @@
 
 Nothing yet.
 
+## 0.7.2 (2026-10-09)
+
+Fixes from three code reviews. A page that built before carries the same data; only the card's
+source check in the inlined viewer changed (below). Errors:
+`--max-mb 1e308` and `--endpoint 'http://[bad'` were Python tracebacks and are one-line errors now
+(`ttl3d.Query` refuses a malformed endpoint as "the endpoint is not a well-formed URL"); a directory, a
+missing file or a pipe given as input says which (`X is a directory, not a file`, `X: no such file`, `X
+is not a regular file`) instead of printing the bare path; a `--focus` or `--attribute-preds` term that
+cannot be an IRI (a space, `<`, `{`, ...) or is empty is an error naming it, and rdflib no longer logs a
+warning about it first, so the Python API stays silent. SPARQL: an answer without a Content-Length is
+read a megabyte at a time (the read sized its buffer by the limit, so a huge `max_bytes` failed and the
+default reserved 100 MB up front); an HTTP error whose body timed out or broke off is still "answered
+500" and the response is closed; a redirect message has the request's credentials blanked like any
+other server text. The node card names the sources of its relations whenever more than one source
+asserted something, including a source that only adds links (it owns no node, so the card left them
+out). Terms may have spaces around their commas (`--focus "ex:Dune, ex:Asimov"`). A `set` of sources
+raises TypeError, since its order, which names the page and orders the legend, followed the hash seed.
+`Page`'s repr counts UTF-8 bytes rather than characters. `tools/compare_pages.py` masks a node's five
+coordinates only as one run, so a numeric property named `x` can never pass as layout drift, and prints
+its usage on bad arguments. New tests cover `tools/licenses.py`, cyclic and shared blank nodes in a
+slice, `--max-mb inf`/`nan` and the card's source attribution in the browser.
+
 ## 0.7.1 (2026-10-05)
 
 Vendored bundle: force-graph 1.51.5 and three.js 0.186.1 (Dependabot #23). Pages look and

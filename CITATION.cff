@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: Abadifard
     given-names: Soheil
-version: 0.7.1
-date-released: 2026-10-05
+version: 0.7.2
+date-released: 2026-10-09
 license: MIT
 doi: 10.5281/zenodo.22716060
 identifiers:
