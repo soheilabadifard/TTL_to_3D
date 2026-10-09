@@ -3,10 +3,11 @@
     python tools/compare_pages.py <dir> <dir> [<dir> ...]
 
 Every directory holds the same page file names, each set built on one platform. The pages
-must be byte-identical except for the pinned layout coordinates ("x", "y", "z", "x2", "y2"
-in the embedded DATA), which Kamada-Kawai lets drift by a few tenths across scipy and BLAS
-builds while the shape stays the same. Exit code 1 when a page differs anywhere else, is
-missing, or drifts beyond the tolerance.
+must be byte-identical except for the pinned layout coordinates (the run of "x", "y", "z",
+"x2", "y2" numbers every pinned node carries in the embedded DATA), which Kamada-Kawai lets
+drift by a few tenths across scipy and BLAS builds while the shape stays the same. Exit code
+1 when a page differs anywhere else, is missing, or drifts beyond the tolerance; 2 when the
+arguments are not two or more directories.
 """
 from __future__ import annotations
 
@@ -14,8 +15,12 @@ import re
 import sys
 from pathlib import Path
 
-COORD = re.compile(r'"(x|y|z|x2|y2)": (-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)')
+_NUMBER = r'(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)'
+# all five in a row, so a lone property value that happens to be named "x" is never taken for one
+COORDS = re.compile(", ".join(f'"{key}": {_NUMBER}' for key in ("x", "y", "z", "x2", "y2")))
+MASKED = '"x": #, "y": #, "z": #, "x2": #, "y2": #'
 TOLERANCE = 1.0   # layout units; the force rest length is about 60
+USAGE = "usage: python tools/compare_pages.py <dir> <dir> [<dir> ...]"
 
 
 def strip_coordinates(text: str) -> tuple[str, list[float]]:
@@ -23,10 +28,10 @@ def strip_coordinates(text: str) -> tuple[str, list[float]]:
     coords: list[float] = []
 
     def mask(m: re.Match) -> str:
-        coords.append(float(m.group(2)))
-        return f'"{m.group(1)}": #'
+        coords.extend(float(v) for v in m.groups())
+        return MASKED
 
-    return COORD.sub(mask, text), coords
+    return COORDS.sub(mask, text), coords
 
 
 def compare(reference: str, other: str, tolerance: float = TOLERANCE) -> tuple[bool, str]:
@@ -53,7 +58,14 @@ def _read(path: Path) -> str:
 
 
 def main(dirs: list[str]) -> int:
+    if len(dirs) < 2:
+        print(USAGE, file=sys.stderr)
+        return 2
     first, *others = (Path(d) for d in dirs)
+    for d in (first, *others):
+        if not d.is_dir():
+            print(f"{d} is not a directory", file=sys.stderr)
+            return 2
     failed = False
     for page in sorted(p.name for p in first.iterdir() if p.is_file()):
         reference = _read(first / page)

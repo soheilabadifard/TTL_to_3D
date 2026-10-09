@@ -65,8 +65,9 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 
 The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`). Sources are file paths,
 `rdflib.Graph` or `rdflib.Dataset` objects, `ttl3d.Query` objects (a CONSTRUCT against a SPARQL
-endpoint), `(name, source)` pairs or a `{name: source}` mapping, in any mix; the options are the
-command line's (`focus`, `hops` and `schema` included).
+endpoint), `(name, source)` pairs or a `{name: source}` mapping, in any mix, several in a list (not a
+set: their order names the page and orders the legend); the options are the command line's (`focus`,
+`hops` and `schema` included).
 
 ```python
 import rdflib, ttl3d

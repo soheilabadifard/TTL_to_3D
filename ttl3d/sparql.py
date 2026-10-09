@@ -28,6 +28,7 @@ RDF_MEDIA_TYPES = frozenset({
 ACCEPT = "text/turtle, application/n-triples;q=0.9, application/rdf+xml;q=0.8"
 USER_AGENT = "ttl3d/{} (+https://github.com/soheilabadifard/TTL_to_3D)"   # Wikidata refuses Python-urllib
 MAX_BYTES = 100_000_000                  # 100 MB of answer; the parse needs about 35 times that in memory
+CHUNK = 1 << 20                          # fetch reads the answer a megabyte at a time
 NOT_A_GRAPH = frozenset({                # query forms and updates whose answer is not an RDF graph
     "SELECT", "ASK", "INSERT", "DELETE", "LOAD", "CLEAR", "CREATE", "DROP", "COPY", "MOVE", "ADD", "WITH",
 })
@@ -87,8 +88,12 @@ def prefixes_in(query: str) -> dict[str, str]:
 
 
 def host(endpoint: str) -> str:
-    """The endpoint's hostname, for source names and messages; the endpoint itself when it has none."""
-    return urllib.parse.urlsplit(endpoint).hostname or endpoint
+    """The endpoint's hostname, for source names and messages; the endpoint itself when it has none
+    or cannot be split (an unclosed [IPv6] bracket: building the Query then names the problem)."""
+    try:
+        return urllib.parse.urlsplit(endpoint).hostname or endpoint
+    except ValueError:
+        return endpoint
 
 
 def _where(url: str) -> str:
@@ -124,7 +129,12 @@ class Query:
         if any(c.isspace() for c in self.endpoint):
             # checked before urlsplit, which would otherwise silently strip tabs and newlines
             raise ValueError("the endpoint URL must not contain spaces or line breaks")
-        parts = urllib.parse.urlsplit(self.endpoint)
+        try:
+            parts = urllib.parse.urlsplit(self.endpoint)
+        except ValueError:                    # its message may quote the netloc, user info included,
+            parts = None                      # so raise outside the handler: not even __context__ keeps it
+        if parts is None:
+            raise ValueError("the endpoint is not a well-formed URL")
         try:
             _ = parts.port
         except ValueError:
@@ -190,6 +200,16 @@ def _user_agent() -> str:
     return USER_AGENT.format(__version__)
 
 
+def _read_at_most(resp, limit: int) -> bytes:
+    """Up to `limit` bytes of the answer, a chunk at a time: without a Content-Length, read(limit)
+    sizes its buffer by the limit itself, which fails for a huge one."""
+    parts, size = [], 0
+    while size < limit and (part := resp.read(min(CHUNK, limit - size))):
+        parts.append(part)
+        size += len(part)
+    return b"".join(parts)
+
+
 def fetch(q: Query) -> tuple[bytes, str | None]:
     """POST the query as a form body and return the answer's bytes and media type (without
     parameters; None when the endpoint sent no Content-Type). Every failure is a FetchError naming
@@ -203,14 +223,19 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
     req = urllib.request.Request(q.endpoint, data=urllib.parse.urlencode({"query": q.query}).encode(),
                                  headers=headers, method="POST")
     where = _where(q.endpoint)
+    unsent = None
     try:
         with _OPENER.open(req, timeout=q.timeout) as resp:
-            body = resp.read(q.max_bytes + 1)
+            body = _read_at_most(resp, q.max_bytes + 1)
             media = resp.headers.get_content_type() if resp.headers.get("Content-Type") else None
             short = resp.length                       # bytes promised by Content-Length but never sent
     except urllib.error.HTTPError as e:
-        raw = e.read(4096)
-        e.close()
+        try:
+            raw = e.read(4096)
+        except (OSError, http.client.HTTPException):     # the error body itself timed out or broke off
+            raw = b""
+        finally:
+            e.close()
         # scrub before collapsing whitespace: a secret containing a run of spaces (or split across
         # the truncated first line) must still match exactly, which whitespace-collapsing would break
         scrubbed = _scrub(raw.decode("utf-8", "replace"), q)
@@ -225,11 +250,15 @@ def fetch(q: Query) -> tuple[bytes, str | None]:
     except (OSError, http.client.HTTPException) as e:       # a connection that broke off mid-answer
         raise FetchError(f"endpoint {where} broke off the answer: {e}") from e
     except ValueError as e:
-        if isinstance(e, FetchError):        # the redirect refusal: a FetchError, pass it through as is
+        if isinstance(e, FetchError):        # the redirect refusal names a server-sent URL: scrub it in place
+            e.args = (_scrub(str(e), q),)
             raise
         # http.client can raise ValueError with the header value in its message (e.g. a token or
-        # password containing a stray newline): never let that reach the caller
-        raise FetchError(f"cannot send the request to {where}") from None
+        # password containing a stray newline): raised below, outside this handler, so that not even
+        # the new error's __context__ keeps it
+        unsent = FetchError(f"cannot send the request to {where}")
+    if unsent:
+        raise unsent
     if len(body) > q.max_bytes:
         raise FetchError(f"endpoint {where} answered more than {q.max_bytes / 1e6:g} MB; "
                          "narrow the query or raise the limit (--max-mb, Query.max_bytes)")

@@ -184,6 +184,18 @@ def test_blank_node_structure_below_a_kept_node_survives_whole(tmp_path):
     assert names(graph.build(cut)) == ["Book", "a"]                          # blank nodes are still not nodes
 
 
+def test_cyclic_and_shared_blank_nodes_are_copied_once_and_the_walk_ends(tmp_path):
+    ttl = tmp_path / "c.ttl"
+    ttl.write_text("@prefix ex: <http://example.org/c#> .\n"
+                   "ex:a ex:p _:b1 .\nex:c ex:p _:b1 .\n"            # two kept nodes share one blank node
+                   "_:b1 ex:next _:b2 ; ex:v 1 .\n_:b2 ex:next _:b1 .\n", encoding="utf-8")   # a cycle
+    ds = load.load_files([ttl])
+    focus = [URIRef("http://example.org/c#a"), URIRef("http://example.org/c#c")]
+    cut = slice.select(ds, focus=focus, hops=0).dataset
+    assert len(cut.merged) == len(ds.merged) == 5
+    assert names(graph.build(cut)) == ["a", "c"]
+
+
 def test_describe_names_what_was_kept():
     p = {EX: "ex"}
     assert slice.describe(3, 12, [ex("Dune")], 1, False, p) == "kept 3 of 12 nodes (focus ex:Dune, 1 hop)"

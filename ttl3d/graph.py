@@ -23,6 +23,7 @@ too; only IRI sources appear in the node's `sources` list.
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -38,6 +39,7 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
+_NOT_IN_IRI = re.compile(r'[\x00-\x20<>"{}|\\^`]')   # what Turtle's IRIREF excludes; rdflib logs about most
 
 
 @dataclass(frozen=True)
@@ -97,11 +99,14 @@ def resolve_terms(terms, ds: Dataset) -> set:
         by_prefix.setdefault(prefix, ns)
     out = set()
     for term in terms:
-        if term.startswith("<") and term.endswith(">"):
-            out.add(URIRef(term[1:-1]))
-            continue
-        if "://" in term:
-            out.add(URIRef(term))
+        bracketed = term.startswith("<") and term.endswith(">")
+        written = term[1:-1] if bracketed else term
+        if not written:
+            raise ValueError("an empty term; write a prefixed name such as ex:Dune or a full IRI")
+        if (bad := _NOT_IN_IRI.search(written)):              # before URIRef, which would log about it
+            raise ValueError(f"{term!r} cannot be an IRI: it contains {bad.group()!r}")
+        if bracketed or "://" in term:
+            out.add(URIRef(written))
             continue
         prefix, _, name = term.partition(":")
         if prefix not in by_prefix:

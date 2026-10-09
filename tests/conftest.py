@@ -69,16 +69,20 @@ ANSWERS = {                                   # path -> (status, media type or N
     "/auth": (200, "text/turtle", TURTLE),
     "/moved": (301, None, b""),
     "/moved307": (307, None, b""),                      # same Location as /moved, a 307 instead
+    "/movedecho": (302, None, b""),                     # echoes the credential into the Location path
+    "/nolength": (200, "text/turtle", TURTLE),          # no Content-Length: the body ends when it closes
+    "/slow500": (500, "text/plain", b"too late"),       # the error body comes 1.5 s after the headers
 }
 
 
 class _StubEndpoint(BaseHTTPRequestHandler):
     """A SPARQL endpoint that answers by path (ANSWERS): /auth wants an Authorization header, /slow
     sleeps first, /moved and /moved307 redirect with user info and a signed query string in their
-    Location, /echo puts the request's Authorization header in its error body (and, for a Basic
-    header, the decoded user:password too), /chunkcut sends one complete chunk of a chunked answer
-    and closes before the terminating chunk. Every request is recorded on the server as (path,
-    headers, body)."""
+    Location, /movedecho redirects to a path holding the Authorization header's credential, /echo puts
+    that header in its error body (and, for a Basic header, the decoded user:password too), /nolength
+    sends no Content-Length, /slow500 sleeps between its headers and its body, /chunkcut sends one
+    complete chunk of a chunked answer and closes before the terminating chunk. Every request is
+    recorded on the server as (path, headers, body)."""
 
     def log_message(self, *args):             # keep pytest's output clean
         pass
@@ -104,13 +108,19 @@ class _StubEndpoint(BaseHTTPRequestHandler):
         if self.path == "/slow":
             time.sleep(1.5)
         self.send_response(status)
+        port = self.server.server_address[1]
         if self.path in ("/moved", "/moved307"):
-            port = self.server.server_address[1]
             self.send_header("Location", f"http://alice:hunter2@127.0.0.1:{port}/sparql?key=SIGNED#f")
+        if self.path == "/movedecho":
+            credential = self.headers.get("Authorization", "none").split(" ", 1)[-1]
+            self.send_header("Location", f"http://127.0.0.1:{port}/{credential}/sparql")
         if media:
             self.send_header("Content-Type", media + ("; charset=utf-8" if media.startswith("text/") else ""))
-        self.send_header("Content-Length", "100" if self.path == "/cut" else str(len(data)))
+        if self.path != "/nolength":
+            self.send_header("Content-Length", "100" if self.path == "/cut" else str(len(data)))
         self.end_headers()
+        if self.path == "/slow500":
+            time.sleep(1.5)
         self.wfile.write(data)
 
 

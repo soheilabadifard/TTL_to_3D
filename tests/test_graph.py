@@ -252,6 +252,36 @@ def test_resolve_terms_expands_curies_and_rejects_unknown_prefixes(library):
         graph.resolve_terms(["nope:thing"], ds)
 
 
+@pytest.mark.parametrize(("term", "char"), [
+    ("ex:Dune, ex:Asimov", " "), ("ex:Dune Messiah", " "), ("<http://example.org/a b>", " "),
+    ("http://example.org/a\tb", "\t"), ("ex:a<b", "<"), ("http://example.org/{x}", "{"),
+    ("ex:a\x01", "\x01")])
+def test_resolve_terms_refuses_what_cannot_be_an_iri_before_rdflib_logs_about_it(library, term, char, caplog):
+    ds = load.load_files([library])
+    caplog.clear()
+    with pytest.raises(ValueError) as e:
+        graph.resolve_terms([term], ds)
+    assert str(e.value) == f"{term!r} cannot be an IRI: it contains {char!r}"
+    assert caplog.records == []                 # rdflib logs "does not look like a valid URI" otherwise
+
+
+def test_resolve_terms_takes_the_unicode_an_iri_may_hold(library, caplog):
+    ds = load.load_files([library])
+    caplog.clear()
+    assert graph.resolve_terms(["ex:Caf\u00e9\u00a0Noir", "<http://example.org/a\u3000b>"], ds) == {
+        URIRef(EX + "Caf\u00e9\u00a0Noir"), URIRef("http://example.org/a\u3000b")}   # ucschar, not spaces
+    assert caplog.records == []
+
+
+@pytest.mark.parametrize("term", ["", "<>"])
+def test_resolve_terms_refuses_an_empty_term_rather_than_naming_a_namespace(tmp_path, term):
+    ttl = tmp_path / "d.ttl"
+    ttl.write_text("@prefix : <http://example.org/d#> .\n:a :p :b .\n", encoding="utf-8")
+    ds = load.load_files([ttl])                      # ":" is bound, so "" would be its namespace
+    with pytest.raises(ValueError, match="an empty term"):
+        graph.resolve_terms([term], ds)
+
+
 def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(library):
     ds = load.load_files([library])
     assert graph.resolve_terms(["<urn:isbn:0451450523>", "<mailto:x@example.org>"], ds) == {

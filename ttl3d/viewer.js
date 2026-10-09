@@ -142,7 +142,9 @@ function showNode(n) {
   }
   const rl = rels[n.id] || [];
   const out = rl.filter(r => r.dir === 'out'), inn = rl.filter(r => r.dir === 'in');
-  const manyFiles = new Set(DATA.nodes.map(n => n.file)).size > 1;
+  // a source that only asserts links owns no node, so count the links' sources too
+  const inputs = new Set([...DATA.nodes.map(n => n.file), ...DATA.links.flatMap(l => l.files)]);
+  const manyFiles = inputs.size > 1;
   const relRow = r => {
     const o = byId[r.other];
     const name = o ? esc(o.label) : esc(r.other);

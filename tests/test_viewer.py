@@ -449,3 +449,28 @@ def test_type_mode_selection_ignores_a_source_whose_name_matches_a_type(tmp_path
         finally:
             browser.close()
     assert errors == []
+
+
+def test_relation_rows_name_their_sources_when_only_the_links_come_from_several(tmp_path):
+    prefix = "@prefix ex: <http://example.org/r#> .\n"
+    (tmp_path / "base.ttl").write_text(prefix + "ex:a ex:p ex:b .\nex:b ex:q ex:c .\n", encoding="utf-8")
+    (tmp_path / "edges.ttl").write_text(prefix + "ex:a ex:r ex:b .\n", encoding="utf-8")   # owns no node
+    out = tmp_path / "r.html"
+    _run_cli(str(tmp_path / "base.ttl"), str(tmp_path / "edges.ttl"), "-o", str(out), "--view", "2d")
+    alone = tmp_path / "alone.html"
+    _run_cli(str(tmp_path / "base.ttl"), "-o", str(alone), "--view", "2d")
+    card = "document.querySelector('#detail').textContent"         # innerText would follow the CSS uppercase
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            assert page.evaluate("new Set(DATA.nodes.map(n => n.file)).size") == 1
+            page.evaluate("showNode(DATA.nodes.find(n => n.label === 'a'))")
+            assert "[base, edges]" in page.evaluate(card)
+            page.goto(alone.as_uri())                       # one source: no attribution to show
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            page.evaluate("showNode(DATA.nodes.find(n => n.label === 'a'))")
+            assert "outgoing" in page.evaluate(card) and "[base]" not in page.evaluate(card)
+        finally:
+            browser.close()
+    assert errors == []
