@@ -67,6 +67,9 @@ def assign_colors(groups, counts=None) -> dict:
     return colors
 
 
+BUTTON = ' role="button" tabindex="0" aria-pressed="false"'    # a legend row toggles like a button
+
+
 def _legend(groups, colors, counts, graphs=None) -> str:
     """One clickable row per coloured group. A named-graph key carries its IRI as the hover title; an
     annotation-only source (no node, no link of its own) is muted, keeps its row outside the colour
@@ -80,12 +83,12 @@ def _legend(groups, colors, counts, graphs=None) -> str:
         hints = ([graphs[g]] if g in graphs else []) + ([ANNOTATION_ONLY] if annot else [])
         title = f' title="{esc(". ".join(hints))}"' if hints else ""
         cls = "row grp annot" if annot else "row grp"
-        return (f'<div class="{cls}" data-group="{esc(g)}"{title}><span class="dot" '
+        return (f'<div class="{cls}" data-group="{esc(g)}"{title}{BUTTON}><span class="dot" '
                 f'style="background:{colors.get(g, UNKNOWN_COLOR)}"></span>{esc(g)}</div>')
 
     rows = [row(g) for g in groups if g in top or g == "?" or annotation_only(g, counts)]
     if rest:
-        rows.append(f'<div class="row grp" data-groups="{esc(json.dumps(rest))}"><span class="dot" '
+        rows.append(f'<div class="row grp" data-groups="{esc(json.dumps(rest))}"{BUTTON}><span class="dot" '
                     f'style="background:{OTHER_COLOR}"></span>other ({len(rest)} groups)</div>')
     return "".join(rows)
 
@@ -167,7 +170,7 @@ __CSS__</style>
   <h1>__TITLE__</h1>
   <div class="sub">__COUNTS__ · colored by __COLORBY__</div>
   __LEGEND__
-  <input id="q" placeholder="search labels…" autocomplete="off">
+  <input id="q" placeholder="search labels…" aria-label="search node labels" autocomplete="off">
   <div class="row views">view
     <label><input type="radio" name="view" value="3d"> 3D</label>
     <label><input type="radio" name="view" value="2d"> 2D</label></div>
@@ -178,9 +181,11 @@ __CSS__</style>
   <button id="clear">clear filters</button>
   <div id="hint">click legend rows to light a group's nodes, their neighbors, and the edges it asserts ·
     edges wear the color of the file asserting them when coloring by file ·
-    <span id="nav"></span> · click a node for details</div>
+    <span id="nav"></span> · click a node for details ·
+    keyboard: Tab to the legend, Enter in the search box opens the best match, Esc closes the card</div>
 </div>
-<div id="detail"><button id="close">×</button><div id="detail-body"></div></div>
+<div id="detail" role="region" aria-label="node details" aria-live="polite">
+  <button id="close" aria-label="close the card">×</button><div id="detail-body"></div></div>
 <div id="graph"></div>
 <script>__LIB__</script>
 <script>

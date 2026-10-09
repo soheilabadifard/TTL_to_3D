@@ -474,3 +474,63 @@ def test_relation_rows_name_their_sources_when_only_the_links_come_from_several(
         finally:
             browser.close()
     assert errors == []
+
+
+def test_the_keyboard_reaches_the_legend_the_search_matches_and_the_relations(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    focused = "document.activeElement"
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            assert page.evaluate("document.getElementById('q').getAttribute('aria-label')")
+            assert page.evaluate("document.getElementById('close').getAttribute('aria-label')")
+            page.keyboard.press("Tab")                                  # the first stop is a legend row
+            assert page.evaluate(f"{focused}.matches('.row.grp[role=button]')")
+            page.keyboard.press("Enter")
+            assert page.evaluate(f"{focused}.classList.contains('active')")
+            assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "true"
+            assert page.evaluate("DATA.nodes.some(n => n._dim)")
+            page.keyboard.press(" ")
+            assert page.evaluate(f"{focused}.getAttribute('aria-pressed')") == "false"
+            assert not page.evaluate("DATA.nodes.some(n => n._dim)")
+            page.fill("#q", "planet")         # "NASA planetary fact sheets" sorts first; the exact label wins
+            page.press("#q", "Enter")
+            assert page.evaluate(f"{focused}.textContent") == "planet"
+            page.fill("#q", "earth")
+            page.press("#q", "Enter")
+            assert page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.matches('#detail h2')")
+            assert page.evaluate(f"{focused}.textContent") == "Earth"
+            page.keyboard.press("Tab")
+            assert page.evaluate(f"{focused}.matches('#detail .rel[role=button]')")
+            neighbour = page.evaluate(f"byId[{focused}.dataset.node].label")
+            page.keyboard.press("Enter")
+            assert page.evaluate(f"{focused}.matches('#detail h2')")
+            assert page.evaluate(f"{focused}.textContent") == neighbour != "Earth"
+            page.keyboard.press("Escape")
+            assert not page.evaluate("document.getElementById('detail').classList.contains('open')")
+            assert page.evaluate(f"{focused}.id") == "q"
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_a_click_still_leaves_the_focus_where_it_was(tmp_path):
+    out = tmp_path / "solar-2d.html"
+    _run_cli(*DEMO, "-o", str(out), "--view", "2d")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.focus("#q")
+            page.evaluate("showNode(DATA.nodes.find(n => n.label === 'Earth'))")   # what a node click calls
+            assert page.evaluate("document.activeElement.id") == "q"
+            page.click(".row.grp")
+            assert page.evaluate("document.querySelector('.row.grp').getAttribute('aria-pressed')") == "true"
+            page.click("#clear")
+            assert page.evaluate("document.querySelector('.row.grp').getAttribute('aria-pressed')") == "false"
+        finally:
+            browser.close()
+    assert errors == []

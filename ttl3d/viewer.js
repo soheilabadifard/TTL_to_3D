@@ -121,9 +121,11 @@ function esc(s) {
                   .replace(/"/g,'&quot;');
 }
 
-function showNode(n) {
+// `byKeyboard`: the card was opened with a key, so the focus moves to its heading and Tab goes on to its
+// relations; a pointer leaves the focus where it was
+function showNode(n, byKeyboard = false) {
   RENDERERS[view].focus(n);
-  let h = `<h2><span class="dot" style="background:${colorOf(n)}"></span>${esc(n.label)}</h2>`;
+  let h = `<h2 tabindex="-1"><span class="dot" style="background:${colorOf(n)}"></span>${esc(n.label)}</h2>`;
   h += `<div class="cls">${esc(n.types.join(', ') || 'untyped')} · ${esc(n.group)}</div>`;
   h += `<div class="iri">${esc(n.id)}</div>`;
   if (n.definition) h += `<p class="def">${esc(n.definition)}</p>`;
@@ -150,8 +152,8 @@ function showNode(n) {
     const name = o ? esc(o.label) : esc(r.other);
     const files = manyFiles && r.files.length ? ` <span class="pred">[${esc(r.files.join(', '))}]</span>` : '';
     return r.dir === 'out'
-      ? `<div class="rel" data-node="${esc(r.other)}"><span class="pred">${esc(r.pred)}</span> → <b>${name}</b>${files}</div>`
-      : `<div class="rel" data-node="${esc(r.other)}"><b>${name}</b> <span class="pred">${esc(r.pred)}</span> →${files}</div>`;
+      ? `<div class="rel" ${relAttrs(r)}><span class="pred">${esc(r.pred)}</span> → <b>${name}</b>${files}</div>`
+      : `<div class="rel" ${relAttrs(r)}><b>${name}</b> <span class="pred">${esc(r.pred)}</span> →${files}</div>`;
   };
   if (out.length) h += `<h3>outgoing (${out.length})</h3>` + out.map(relRow).join('');
   if (inn.length) h += `<h3>incoming (${inn.length})</h3>` + inn.map(relRow).join('');
@@ -165,17 +167,37 @@ function showNode(n) {
   }
   document.getElementById('detail-body').innerHTML = h;
   document.getElementById('detail').classList.add('open');
-  document.querySelectorAll('#detail .rel').forEach(el =>
-    el.addEventListener('click', () => {
-      const t = byId[el.dataset.node];
-      if (t) showNode(t);
-    }));
+  document.querySelectorAll('#detail .rel').forEach(el => {
+    const open = byKey => { const t = byId[el.dataset.node]; if (t) showNode(t, byKey); };
+    el.addEventListener('click', () => open(false));
+    onActivate(el, () => open(true));
+  });
+  if (byKeyboard) document.querySelector('#detail h2').focus();
+}
+
+function relAttrs(r) {
+  return `data-node="${esc(r.other)}" role="button" tabindex="0"`;
+}
+
+// Enter or Space on a focused element that only looks like a button
+function onActivate(el, act) {
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();                           // Space would scroll the panel
+    act();
+  });
 }
 
 function closeDetail() {
-  document.getElementById('detail').classList.remove('open');
+  const card = document.getElementById('detail');
+  const hadFocus = card.contains(document.activeElement);
+  card.classList.remove('open');
+  if (hadFocus) document.getElementById('q').focus();   // not lost on a hidden card
 }
 document.getElementById('close').addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('detail').classList.contains('open')) closeDetail();
+});
 
 // --- one shared filter: legend group selection AND label search -------------
 const activeGroups = new Set();
@@ -217,18 +239,36 @@ document.querySelectorAll('.row.grp').forEach(row => {
   // a bucket row ("other") toggles every group it stands for
   const members = row.dataset.groups ? JSON.parse(row.dataset.groups) : [row.dataset.group];
   row.addEventListener('click', () => {
-    if (members.some(g => activeGroups.has(g))) {
-      members.forEach(g => activeGroups.delete(g)); row.classList.remove('active');
-    } else {
-      members.forEach(g => activeGroups.add(g)); row.classList.add('active');
-    }
+    const on = !members.some(g => activeGroups.has(g));
+    members.forEach(g => on ? activeGroups.add(g) : activeGroups.delete(g));
+    row.classList.toggle('active', on);
+    row.setAttribute('aria-pressed', String(on));
     applyFilter();
   });
+  onActivate(row, () => row.click());
 });
 
 document.getElementById('q').addEventListener('input', e => {
   query = e.target.value.trim().toLowerCase();
   applyFilter();
+});
+
+// Enter in the search box opens the card of the best match among the nodes left lit: the exact label,
+// then labels starting with the text, then the rest; code-point order within each (localeCompare would
+// let browsers disagree on "Moon" and "moon")
+function bestMatch() {
+  const rank = n => {
+    const l = n.label.toLowerCase();
+    return l === query ? 0 : l.startsWith(query) ? 1 : 2;
+  };
+  const order = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  return DATA.nodes.filter(n => !n._dim && n.label.toLowerCase().includes(query))
+    .sort((a, b) => rank(a) - rank(b) || order(a.label, b.label) || order(a.id, b.id))[0];
+}
+document.getElementById('q').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !query) return;
+  const n = bestMatch();
+  if (n) showNode(n, true);
 });
 
 const nodeLabelBox = document.getElementById('nodelabels');
@@ -257,7 +297,10 @@ document.getElementById('clear').addEventListener('click', () => {
   activeGroups.clear();
   query = '';
   document.getElementById('q').value = '';
-  document.querySelectorAll('.row.grp.active').forEach(r => r.classList.remove('active'));
+  document.querySelectorAll('.row.grp.active').forEach(r => {
+    r.classList.remove('active');
+    r.setAttribute('aria-pressed', 'false');
+  });
   applyFilter();
 });
 
