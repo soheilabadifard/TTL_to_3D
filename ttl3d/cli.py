@@ -18,7 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="RDF files, or - for standard input; the format is guessed from the extension")
     p.add_argument("-o", "--out",
                    help="output HTML path (default: <first source name>-<view>.html in the current "
-                        "directory; stdin for -)")
+                        "directory, any colon as _; stdin for -)")
     p.add_argument("--color-by", choices=graph.COLOR_KEYS, default="file",
                    help="what the node colors and legend mean (default: file; a named graph of a TriG or "
                         "N-Quads file counts as a file)")

@@ -9,7 +9,8 @@ Nothing yet.
 The default output file name no longer holds a colon. An IPv6 endpoint (`--endpoint
 http://[::1]:8890/sparql` with inline query text) named it `::1-3d.html`, which Windows refuses (and
 its pathlib read the leading `::` as a drive, losing the working directory); it is `__1-3d.html` now.
-The legend row and the page title still read `::1`, and `-o` is taken as given.
+The rule covers whatever source comes first, so a file `a:b.ttl` now defaults to `a_b-3d.html`. The
+legend row and the page title still read `::1`, and `-o` is taken as given.
 
 ## 0.8.0 (2026-10-09)
 
