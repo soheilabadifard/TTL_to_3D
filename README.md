@@ -1,6 +1,7 @@
 # ttl3d
 
 [![PyPI](https://img.shields.io/pypi/v/ttl3d.svg)](https://pypi.org/project/ttl3d/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/ttl3d.svg)](https://anaconda.org/conda-forge/ttl3d)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22716060.svg)](https://doi.org/10.5281/zenodo.22716060)
 [![tests](https://github.com/soheilabadifard/TTL_to_3D/actions/workflows/tests.yml/badge.svg)](https://github.com/soheilabadifard/TTL_to_3D/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
