@@ -34,10 +34,15 @@ Python 3.10 or newer.
 pip install ttl3d
 ```
 
+or, from conda-forge (Python 3.11 or newer there):
+
+```bash
+conda install -c conda-forge ttl3d
+```
+
 For the development version, `pip install git+https://github.com/soheilabadifard/TTL_to_3D`,
 or clone the repository and run `pip install -e .`. The dependencies are
-`rdflib`, `networkx`, `numpy` and `scipy`, all available on conda-forge as
-well.
+`rdflib`, `networkx`, `numpy` and `scipy`.
 
 ## Quick start
 

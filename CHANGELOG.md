@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-Nothing yet.
+ttl3d is on conda-forge: `conda install -c conda-forge ttl3d` (Python 3.11 or newer there; the
+[feedstock](https://github.com/conda-forge/ttl3d-feedstock) follows each PyPI release).
 
 ## 0.8.1 (2026-10-12)
 
