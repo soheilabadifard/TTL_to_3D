@@ -130,7 +130,8 @@ def main(argv: list[str] | None = None) -> int:
     # files first, then queries: the first source names the page and the default output
     names = [("stdin" if f == "-" else Path(f).stem) for f in args.files]
     names += [_query_name(q, args.endpoint) for q in args.query]
-    out = Path(args.out) if args.out else Path.cwd() / f"{names[0]}-{args.view}.html"
+    # no colon in the default file name: Windows refuses one, and an IPv6 host such as ::1 has them
+    out = Path(args.out) if args.out else Path.cwd() / f"{names[0].replace(':', '_')}-{args.view}.html"
     inputs = [f for f in args.files if f != "-"] + [q[1:] for q in args.query if q.startswith("@")]
     # by identity, not by spelling: on case-insensitive filesystems Graph.ttl is graph.ttl
     if out.exists() and any(Path(f).exists() and out.samefile(f) for f in inputs):

@@ -425,6 +425,19 @@ def test_a_query_is_a_source_named_after_the_host_and_announced_on_stderr(tmp_pa
     assert "<title>127.0.0.1</title>" in page and '"groups": ["127.0.0.1"]' in page
 
 
+def test_an_ipv6_host_keeps_its_name_but_the_default_file_name_has_no_colon(tmp_path, monkeypatch, capsys):
+    # Windows refuses a colon in a file name, and its pathlib reads the leading "::" of ::1-3d.html as a
+    # drive; the answer is canned so that the test needs no IPv6 loopback
+    from ttl3d import sparql
+    answer = b"<http://e/a> <http://e/p> <http://e/b> ."
+    monkeypatch.setattr(sparql, "fetch", lambda q: (answer, "text/turtle"))
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--endpoint", "http://[::1]:8890/sparql", "--query", Q]) == 0
+    assert "__1-3d.html (view: 3d" in capsys.readouterr().out
+    page = (tmp_path / "__1-3d.html").read_text(encoding="utf-8")
+    assert "<title>::1</title>" in page and '"groups": ["::1"]' in page
+
+
 def test_a_query_file_is_named_by_its_stem_and_mixes_with_files(tmp_path, endpoint, library, library_extra,
                                                                  capsys):
     rq = tmp_path / "moons.rq"

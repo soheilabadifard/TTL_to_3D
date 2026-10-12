@@ -88,7 +88,7 @@ notebook behind the badge.
 | Option | Values | Meaning |
 |--------|--------|---------|
 | `-` (as a file) | | Read standard input, parsed as `--format` or Turtle; the page and the default output name are called `stdin`. Relative IRIs resolve against the working directory (a file's resolve against its folder); declare `@base` to be explicit. |
-| `-o, --out` | path | Output file. Default: `<first source's name>-<view>.html` in the current directory (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text). |
+| `-o, --out` | path | Output file. Default: `<first source's name>-<view>.html` in the current directory (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text), with any colon as `_`: an IPv6 endpoint `http://[::1]:8890/sparql` writes `__1-3d.html`. |
 | `--color-by` | `file` (default), `type`, `namespace` | What node colours and the legend mean. In `file` mode edges also take the colour of the file asserting them. A named graph of a TriG or N-Quads file counts as a file. |
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed Kamada-Kawai position, one layout per view (3D and 2D); `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
 | `--labels` | `auto` (default), `always`, `hover` | Permanent label sprites. `auto` keeps node labels up to 800 nodes and edge labels up to 800 links; `hover` leaves tooltips only. |
