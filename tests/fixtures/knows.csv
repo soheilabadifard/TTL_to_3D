@@ -1,0 +1,7 @@
+source,target,relation,since,weight
+alice,bob,knows,2020,0.4
+bob,alice,knows,2021,
+bob,dune,wrote,,
+alice,dune,read,2019,
+alice,dune,read,2019,
+carol,alice,knows,,

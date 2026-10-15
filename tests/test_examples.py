@@ -39,3 +39,24 @@ def test_the_demo_site_and_the_identical_pages_job_build_the_trig_page():
     assert 'href="solar-system-trig.html"' in index
     tests_yml = (REPO / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
     assert "examples/solar-system.trig" in tests_yml       # built on three operating systems, compared
+
+
+MISSIONS = [EXAMPLES / "missions.csv", EXAMPLES / "mission-links.csv"]
+
+
+def test_the_table_demo_is_a_property_graph_with_edge_properties():
+    data = graph.build(load.load(MISSIONS), color_by="type")
+    assert (len(data["nodes"]), len(data["links"])) == (28, 35)        # the counts the README prints
+    assert data["groups"] == ["Agency", "Asteroid", "Comet", "DwarfPlanet", "Mission", "Moon", "Planet",
+                              "Probe"]
+    visits = [l for l in data["links"] if l["predicates"] == ["visited"]]
+    assert len(visits) == 19 and all(len(l["statements"]) == 1 for l in visits)
+    assert all("statements" not in l for l in data["links"] if l["predicates"] != ["visited"])
+
+
+def test_the_demo_site_and_the_identical_pages_job_build_the_table_page():
+    pages = (REPO / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+    assert "examples/missions.csv examples/mission-links.csv" in pages and "site/missions.html" in pages
+    assert 'href="missions.html"' in (REPO / "docs" / "demo" / "index.html").read_text(encoding="utf-8")
+    tests_yml = (REPO / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    assert "examples/missions.csv" in tests_yml            # built on three operating systems, compared

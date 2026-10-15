@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 
 import pytest
-from rdflib import Graph, Namespace, URIRef
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDFS
 
 from ttl3d import graph, load, sparql
 
@@ -542,3 +543,109 @@ def test_the_notice_names_the_credentials_sent_and_never_the_token(endpoint):
     load.load(sparql.Query(endpoint.url + "/auth", Q, token="tok123"), notice=seen.append)
     assert seen[0].endswith(" s with a Bearer token over plain http")
     assert "tok123" not in seen[0]
+
+
+TABLE_NS = "urn:x-ttl3d:"
+
+
+class Frame:
+    """Just enough of a DataFrame: columns, to_csv(index=False), and iteration over column names."""
+    columns = ("id", "name")
+
+    def __iter__(self):
+        return iter(self.columns)
+
+    def to_csv(self, index=True):
+        return "id,name\n1,One\n"
+
+
+def test_tables_keep_their_place_among_the_sources(people, knows, library):
+    ds = load.load([knows, library, people])
+    assert ds.sources == ["knows", "library", "people"] and list(ds.graphs) == ["knows", "library", "people"]
+    assert ds.files == [knows, library, people]
+    assert ds.prefixes[TABLE_NS] == "csv"
+    assert (URIRef(TABLE_NS + "alice"), URIRef(TABLE_NS + "knows"), URIRef(TABLE_NS + "bob")) in ds.merged
+
+
+def test_a_table_id_resolves_through_a_prefix_that_a_later_rdf_file_binds(tmp_path, library):
+    edges = tmp_path / "e.csv"
+    edges.write_text("source,target,relation\nex:Dune,ex:Herbert,ex:wrote\nex:Dune,Person:1,\n",
+                     encoding="utf-8")
+    ds = load.load([edges, library])               # the table comes first, its prefixes later
+    ex = Namespace("http://example.org/library#")
+    assert (ex.Dune, ex.wrote, ex.Herbert) in ds.graphs["e"]
+    assert (ex.Dune, URIRef(TABLE_NS + "related"), URIRef(TABLE_NS + "Person:1")) in ds.graphs["e"]
+
+
+def test_an_rdf_file_that_binds_the_base_keeps_its_own_prefix(tmp_path, people):
+    ttl = tmp_path / "mine.ttl"
+    ttl.write_text("@prefix mine: <urn:x-ttl3d:> .\nmine:alice mine:p mine:bob .\n", encoding="utf-8")
+    assert load.load([people, ttl]).prefixes[TABLE_NS] == "mine"
+
+
+def test_format_csv_reads_any_path_as_a_table(tmp_path):
+    f = tmp_path / "data.txt"
+    f.write_text("id,name\n1,One\n", encoding="utf-8")
+    assert len(load.load([f], "csv").merged) == 1
+    with pytest.raises(load.LoadError):
+        load.load([f])                                  # the extension says nothing: Turtle, which fails
+
+
+def test_a_dataframe_is_one_source_named_table_or_by_its_pair():
+    ds = load.load(Frame())                             # bare: not iterated as column names
+    assert ds.sources == ["table"] and ds.files == []
+    ds = load.load([("people", Frame()), Frame()])
+    assert ds.sources == ["people", "table"] and len(ds.graphs["people"]) == 1
+
+
+def test_a_table_problem_is_a_load_error_naming_the_table(tmp_path):
+    f = tmp_path / "bad.csv"
+    f.write_text("a,b\n1,2\n", encoding="utf-8")
+    with pytest.raises(load.LoadError, match=r"bad.csv: no source and target columns and no id column"):
+        load.load([f])
+
+
+def test_columns_need_a_table_and_a_table_that_has_the_header(library, people):
+    with pytest.raises(ValueError, match="^columns were given, but no source is a table$"):
+        load.load([library], columns={"id": "id"})
+    with pytest.raises(ValueError, match="^no table has the column 'key2' that id=key2 names$"):
+        load.load([people], columns={"id": "key2"})
+
+
+def test_a_table_and_a_turtle_file_with_one_stem_get_two_keys(tmp_path, library):
+    ttl, csv = tmp_path / "people.ttl", tmp_path / "people.csv"
+    ttl.write_text(library.read_text(encoding="utf-8"), encoding="utf-8")
+    csv.write_text("id\na\n", encoding="utf-8")
+    ds = load.load([csv, ttl])
+    assert ds.sources == ["people", "people"] and list(ds.graphs) == ["people", "people~2"]
+
+
+def test_an_iri_id_whose_row_says_nothing_is_still_a_node(tmp_path, library):
+    ids = tmp_path / "ids.csv"
+    ids.write_text("id\n<http://example.org/library#Dune>\n<https://example.org/alice>\n", encoding="utf-8")
+    ds = load.load([ids, library])
+    alice = URIRef("https://example.org/alice")
+    assert set(ds.graphs["ids"]) == {(alice, URIRef("http://www.w3.org/2000/01/rdf-schema#label"),
+                                      Literal("alice"))}       # Dune is a subject in library already
+
+
+def test_the_table_prefix_steps_aside_when_an_input_binds_csv_elsewhere(tmp_path, people):
+    ttl = tmp_path / "other.ttl"
+    ttl.write_text("@prefix csv: <http://example.org/csv-spec#> .\ncsv:a csv:p csv:b .\n", encoding="utf-8")
+    prefixes = load.load([ttl, people]).prefixes
+    assert prefixes["http://example.org/csv-spec#"] == "csv" and prefixes[TABLE_NS] == "csv2"
+
+
+def test_an_automatic_label_leaves_a_node_an_rdf_file_describes_alone(tmp_path, library):
+    ex = "http://example.org/library#"
+    edges = tmp_path / "edges.csv"
+    edges.write_text("source,target\nHerbert,Dune\n", encoding="utf-8")
+    ds = load.load([edges, library], base=ex)
+    made = ds.graphs["edges"]
+    assert (URIRef(ex + "Herbert"), RDFS.label, None) not in made
+    assert (URIRef(ex + "Dune"), RDFS.label, None) not in made
+    nodes = {n["id"]: n for n in graph.build(ds)["nodes"]}
+    # the edge row itself makes the table the subject of Herbert's edge; the label stays the RDF file's
+    assert nodes[ex + "Herbert"]["label"] == "Frank Herbert"
+    # Dune is only the edge's target here, so the table never owned it
+    assert nodes[ex + "Dune"]["file"] == "library"

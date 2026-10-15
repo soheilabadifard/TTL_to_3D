@@ -51,6 +51,7 @@
   #detail h2:focus { outline:none; }                     /* a target for the focus, not a control */
   #detail .rel .pred { color:#6b7280; }
   #detail .rel b { font-weight:600; }
+  #detail .rel .said { color:#6b7280; font-size:11px; margin-left:12px; }
   #detail .src { margin:1px 0; }
   #detail .src a { color:#2563eb; text-decoration:none; }
   #detail .src a:hover { text-decoration:underline; }

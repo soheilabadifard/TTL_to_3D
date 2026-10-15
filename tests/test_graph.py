@@ -1,4 +1,5 @@
 """ttl3d.graph: the node/link model built from a Dataset."""
+import json
 import os
 import subprocess
 import sys
@@ -215,7 +216,10 @@ def test_a_link_only_asserted_backwards_still_points_forwards(tmp_path):
 
 
 def test_one_way_links_have_an_empty_reverse_list(library):
-    assert all(l["reverse"] == [] for l in build(library)["links"])
+    links = build(library)["links"]
+    assert all(l["reverse"] == [] for l in links)
+    # edge properties are additive: a link no reified statement is about has exactly these keys
+    assert all(set(l) == {"source", "target", "predicates", "reverse", "files", "group"} for l in links)
 
 
 def test_demo_has_no_stacked_inverse_links():
@@ -289,6 +293,10 @@ def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(l
     with pytest.raises(ValueError) as e:
         graph.resolve_terms(["urn:isbn:0451450523"], ds)
     assert "<urn:isbn:0451450523>" in str(e.value)
+
+
+def test_a_bare_prefix_still_names_its_namespace(library):
+    assert graph.resolve_terms(["ex"], load.load_files([library])) == {URIRef(EX)}
 
 
 def test_iri_valued_attribute_predicates_show_on_the_card(tmp_path):
@@ -465,3 +473,98 @@ def test_names_without_a_clash_stay_local_names(library):
     data = graph.build(load.load_files([library]))
     names = {t for n in data["nodes"] for t in n["types"]} | {p for l in data["links"] for p in l["predicates"]}
     assert names and not any(":" in name for name in names)
+
+
+def _link(data, a, b):
+    return next(l for l in data["links"] if {l["source"], l["target"]} == {a, b})
+
+
+T = "urn:x-ttl3d:"
+
+
+def test_edge_properties_of_a_table_ride_on_their_link(people, knows):
+    data = graph.build(load.load([people, knows]))
+    alice_bob = _link(data, T + "alice", T + "bob")
+    assert alice_bob["source"] == T + "alice" and alice_bob["reverse"] == ["knows"]
+    assert alice_bob["statements"] == [
+        {"predicate": "knows", "reverse": False, "props": {"since": ["2020"], "weight": ["0.4"]},
+         "files": ["knows"]},
+        {"predicate": "knows", "reverse": True, "props": {"since": ["2021"]}, "files": ["knows"]}]
+    # two identical rows say it once; a link whose rows carry no properties has no key at all
+    assert _link(data, T + "alice", T + "dune")["statements"] == [
+        {"predicate": "read", "reverse": False, "props": {"since": ["2019"]}, "files": ["knows"]}]
+    assert "statements" not in _link(data, T + "bob", T + "dune")
+    nodes = {n["id"]: n for n in data["nodes"]}
+    assert nodes[T + "bob"]["types"] == ["Author", "Person"] and nodes[T + "bob"]["file"] == "people"
+    assert nodes[T + "carol"]["label"] == "carol" and nodes[T + "carol"]["file"] == "knows"
+    assert nodes[T + "alice"]["definition"] == "A reader." and nodes[T + "alice"]["props"] == {
+        "born": ["1990"]}
+
+
+REIFIED = """@prefix ex: <http://example.org/r#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+ex:a ex:p ex:b ; rdfs:label "A" .
+ex:b rdfs:label "B" .
+[] rdf:subject ex:a ; rdf:predicate ex:p ; rdf:object ex:b ; ex:since "2001" ; ex:source ex:b ; ex:note [] .
+[] a rdf:Statement ; rdf:subject ex:a ; rdf:predicate ex:q ; rdf:object ex:b ; ex:since "1999" .
+[] rdf:subject ex:a ; rdf:predicate rdfs:label ; rdf:object "A" ; ex:since "1998" .
+[] rdf:subject ex:a ; rdf:predicate ex:p ; rdf:object ex:b .
+ex:s1 rdf:subject ex:a ; rdf:predicate ex:p ; rdf:object ex:b ; ex:by ex:a .
+"""
+
+
+def test_reified_statements_in_rdf_annotate_the_links_they_are_about(tmp_path):
+    f = tmp_path / "r.ttl"
+    f.write_text(REIFIED, encoding="utf-8")
+    data = graph.build(load.load([f]))
+    a_b = _link(data, "http://example.org/r#a", "http://example.org/r#b")
+    # the unasserted ex:q, the literal-object label statement and the property-less one say nothing;
+    # an IRI value shows by its label, a blank-node value is left out
+    assert a_b["statements"] == [
+        {"predicate": "p", "reverse": False, "props": {"by": ["A"]}, "files": ["r"]},
+        {"predicate": "p", "reverse": False, "props": {"since": ["2001"], "source": ["B"]}, "files": ["r"]}]
+    assert "http://example.org/r#s1" in {n["id"] for n in data["nodes"]}   # an IRI statement stays a node
+
+
+def test_an_edge_property_name_that_clashes_is_shown_with_its_prefix(tmp_path):
+    f = tmp_path / "c.ttl"
+    f.write_text("@prefix ex: <http://example.org/c#> .\n@prefix ey: <http://example.org/d#> .\n"
+                 "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n"
+                 'ex:a ex:p ex:b ; ey:since "1" .\n'
+                 '[] rdf:subject ex:a ; rdf:predicate ex:p ; rdf:object ex:b ; ex:since "2" .\n',
+                 encoding="utf-8")
+    data = graph.build(load.load([f]))
+    assert _link(data, "http://example.org/c#a", "http://example.org/c#b")["statements"][0]["props"] == {
+        "ex:since": ["2"]}
+    assert next(n for n in data["nodes"] if n["id"].endswith("#a"))["props"] == {"ey:since": ["1"]}
+
+
+def test_an_edge_table_listed_first_owns_the_nodes_it_says_something_about(people, knows):
+    nodes = {n["id"]: n["file"] for n in graph.build(load.load([knows, people]))["nodes"]}
+    # alice and bob are edge sources, so subjects in knows first; dune is only a target there
+    assert nodes == {T + "alice": "knows", T + "bob": "knows", T + "carol": "knows", T + "dune": "people"}
+
+
+def test_each_edge_property_names_the_sources_that_hold_it(tmp_path):
+    (tmp_path / "a.csv").write_text("source,target,relation,since\nx,y,knows,2020\n", encoding="utf-8")
+    (tmp_path / "b.csv").write_text("source,target,relation,since\nx,y,knows,2021\nx,y,knows,2020\n",
+                                    encoding="utf-8")
+    data = graph.build(load.load([tmp_path / "b.csv", tmp_path / "a.csv"]))
+    assert _link(data, T + "x", T + "y")["statements"] == [          # files in source order, b first
+        {"predicate": "knows", "reverse": False, "props": {"since": ["2020"]}, "files": ["b", "a"]},
+        {"predicate": "knows", "reverse": False, "props": {"since": ["2021"]}, "files": ["b"]}]
+
+
+SOLAR = [REPO / "examples" / "solar-system.ttl", REPO / "examples" / "solar-system-missions.ttl"]
+
+
+def test_the_solar_system_model_matches_its_golden_copy():
+    """The demo's model as 0.8.1 built it: input without reified statements must keep every key and
+    value. After an intended model change, regenerate the copy from the repo root with
+        python -c "import json; from ttl3d import graph, load; print(json.dumps(graph.build(
+        load.load_files(['examples/solar-system.ttl', 'examples/solar-system-missions.ttl'])),
+        indent=1, ensure_ascii=False))" > tests/fixtures/solar-data.json
+    """
+    golden = json.loads((REPO / "tests" / "fixtures" / "solar-data.json").read_text(encoding="utf-8"))
+    assert json.loads(json.dumps(graph.build(load.load_files(SOLAR)))) == golden

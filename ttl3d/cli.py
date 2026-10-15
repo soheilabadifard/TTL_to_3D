@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import __version__, api, graph, layout, load, render, sparql
+from . import __version__, api, graph, layout, load, render, sparql, table
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -15,7 +15,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="ttl3d",
         description="Render Turtle / RDF files as one self-contained 2D/3D HTML viewer.")
     p.add_argument("files", nargs="*",
-                   help="RDF files, or - for standard input; the format is guessed from the extension")
+                   help="RDF files, CSV/TSV tables (.csv, .tsv), or - for standard input; the format is "
+                        "guessed from the extension")
     p.add_argument("-o", "--out",
                    help="output HTML path (default: <first source name>-<view>.html in the current "
                         "directory, any colon as _; stdin for -)")
@@ -60,8 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="largest answer to accept, in megabytes (default: 100); the parse needs about 35 "
                         "times an N-Triples answer's size in memory, and more for Turtle")
     p.add_argument("--format", metavar="NAME",
-                   help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads); "
-                        "default: guess from the extension, then try turtle")
+                   help="rdflib parser name for every input (turtle, xml, nt, n3, json-ld, trig, nquads), or "
+                        "csv / tsv to read every input as a table; default: guess from the extension, then "
+                        "try turtle")
+    p.add_argument("--columns", action="append", default=[], metavar="ROLE=HEADER[,...]",
+                   help="the table column that plays a role when its header is not a known name, e.g. "
+                        f"source=from_id; roles: {', '.join(table.ROLES)}; repeatable")
+    p.add_argument("--base", metavar="IRI",
+                   help=f"namespace for table ids that are not IRIs (default: {table.DEFAULT_BASE}, "
+                        f"shown as the prefix {table.PREFIX}, or {table.PREFIX}2 when an input binds "
+                        f"{table.PREFIX} to another namespace)")
     p.add_argument("--version", action="version", version=f"ttl3d {__version__}")
     return p
 
@@ -92,11 +101,33 @@ def _terms(args: list[str]) -> list[str]:
     return [term for arg in args for term in (t.strip() for t in arg.split(",")) if term]
 
 
+def _columns(args: list[str]) -> dict[str, str]:
+    """`--columns source=from_id,target=to_id` (repeatable) as {role: header}; a role named twice is
+    an error, since a dict would keep only the last."""
+    columns: dict[str, str] = {}
+    for item in _terms(args):
+        role, eq, header = (part.strip() for part in item.partition("="))
+        if not eq:
+            raise ValueError(f"--columns wants ROLE=HEADER, got {item!r}")
+        if role in columns:
+            raise ValueError(f"--columns names {role} twice")
+        columns[role] = header
+    return columns
+
+
 def _secret(name: str) -> str | None:
     """An environment variable with a trailing line break stripped: a secrets file or pasted value
     often ends with one. Spaces are kept; a token or password might genuinely have them."""
     value = os.environ.get(name)
     return value.rstrip("\r\n") if value is not None else None
+
+
+def _stdin(fmt: str | None) -> tuple:
+    """Standard input as a named in-memory source: a table under --format csv or tsv, else RDF."""
+    data = sys.stdin.buffer.read()
+    if fmt in table.TABLE_FORMATS:
+        return "stdin", table.read_bytes(data, fmt, "stdin")
+    return "stdin", load.parse_data(data, fmt, "stdin")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -144,16 +175,16 @@ def main(argv: list[str] | None = None) -> int:
     hops = 1 if args.hops is None else args.hops
     try:
         api.check_hops(hops)
+        columns = _columns(args.columns)
+        table.check_columns(columns)                # both before standard input is read
+        table.check_base(args.base)
         auth = (user, _secret("TTL3D_SPARQL_PASSWORD") or "") if user else None
         # every Query is built, and so checked, before standard input is read or anything is sent
         queries = [(name, sparql.Query(args.endpoint, _query_text(q), auth=auth, token=token or None,
                                        timeout=args.timeout, max_bytes=max_bytes))
                    for name, q in zip(names[len(args.files):], args.query)]
         # "-" becomes a named in-memory source; the API itself never sees the dash
-        sources = [
-            ("stdin", load.parse_data(sys.stdin.buffer.read(), args.format, "stdin"))
-            if f == "-" else f for f in args.files
-        ] + queries
+        sources = [_stdin(args.format) if f == "-" else f for f in args.files] + queries
         built = api.build_page(
             sources, title=args.title or None,          # --title "" meant "the first stem" before; keep it
             color_by=args.color_by, layout=args.layout, labels=args.labels,
@@ -161,7 +192,8 @@ def main(argv: list[str] | None = None) -> int:
             attribute_preds=_terms(args.attribute_preds),
             fmt=args.format,
             focus=focus or None, hops=hops,
-            schema=args.schema, notice=lambda message: print(message, file=sys.stderr))
+            schema=args.schema, columns=columns or None, base=args.base,
+            notice=lambda message: print(message, file=sys.stderr))
     except (OSError, ValueError) as e:      # LoadError is a ValueError; an unknown prefix too
         return _fail(e)
     except MemoryError:

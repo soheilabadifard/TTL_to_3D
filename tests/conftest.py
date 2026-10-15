@@ -172,3 +172,16 @@ def endpoint():
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.fixture
+def people():
+    """A node table: ids alice, bob, dune with names, types (bob has two), born and a description."""
+    return FIXTURES / "people.csv"
+
+
+@pytest.fixture
+def knows():
+    """An edge table over people.csv's ids plus carol, with since/weight edge properties; alice knows bob
+    and bob knows alice (one two-way link), and alice read dune twice in identical rows."""
+    return FIXTURES / "knows.csv"

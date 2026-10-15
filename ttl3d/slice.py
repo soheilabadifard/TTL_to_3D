@@ -14,8 +14,9 @@ model code.
         v
     kept --copy--> for each source graph, the kept subjects' triples through the subject index; a
                    triple survives when its object is not an IRI, a kept node, an attribute target or
-                   reserved vocabulary; blank-node objects are followed and their triples kept whole;
-                   sources left empty drop out; merged is rebuilt --> Dataset' + the size of U
+                   reserved vocabulary; blank-node objects are followed and their triples kept whole,
+                   and so is a blank-node rdf:Statement whose subject and object are both kept (edge
+                   properties); sources left empty drop out; merged is rebuilt --> Dataset' + size of U
 """
 from __future__ import annotations
 
@@ -91,9 +92,12 @@ def _copy(source: Graph, kept: set, rules: Rules) -> Graph:
     """The kept subjects' surviving triples from one source graph, through the subject index. An IRI
     object survives when it is a kept node, an attribute target or reserved vocabulary (never an edge
     to a dropped node); literals and blank nodes always survive, and a blank node's own triples are
-    kept whole, recursively, so restrictions and lists stay intact."""
+    kept whole, recursively, so restrictions and lists stay intact. A blank-node reified statement
+    whose rdf:subject and rdf:object are both kept is kept whole too: it carries edge properties."""
     part = Graph()
-    pending, seen = list(kept), set()
+    statements = [x for x in set(source.subjects(RDF.subject, None)) if isinstance(x, BNode)
+                  and all(set(source.objects(x, q)) <= kept for q in (RDF.subject, RDF.object))]
+    pending, seen = list(kept) + statements, set()
     while pending:
         s = pending.pop()
         if s in seen:

@@ -69,11 +69,12 @@ Without installing, run the module from a clone: `python -m ttl3d ...`.
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb)
 
-The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`). Sources are file paths,
-`rdflib.Graph` or `rdflib.Dataset` objects, `ttl3d.Query` objects (a CONSTRUCT against a SPARQL
-endpoint), `(name, source)` pairs or a `{name: source}` mapping, in any mix, several in a list (not a
-set: their order names the page and orders the legend); the options are the command line's (`focus`,
-`hops` and `schema` included).
+The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`; tables and DataFrames need
+`ttl3d>=0.9.0`). Sources are file paths, `rdflib.Graph` or `rdflib.Dataset` objects, `ttl3d.Query`
+objects (a CONSTRUCT against a SPARQL endpoint), DataFrames (see "From tables"), `(name, source)`
+pairs or a `{name: source}` mapping, in any mix, several in a list (not a set: their order names the
+page and orders the legend); the options are the command line's (`focus`, `hops`, `schema`, `columns`
+and `base` included).
 
 ```python
 import rdflib, ttl3d
@@ -93,7 +94,7 @@ notebook behind the badge.
 
 | Option | Values | Meaning |
 |--------|--------|---------|
-| `-` (as a file) | | Read standard input, parsed as `--format` or Turtle; the page and the default output name are called `stdin`. Relative IRIs resolve against the working directory (a file's resolve against its folder); declare `@base` to be explicit. |
+| `-` (as a file) | | Read standard input, parsed as `--format` (an rdflib format, or `csv`/`tsv` for a table) or Turtle; the page and the default output name are called `stdin`. Relative IRIs resolve against the working directory (a file's resolve against its folder); declare `@base` to be explicit. |
 | `-o, --out` | path | Output file. Default: `<first source's name>-<view>.html` in the current directory (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text), with any colon as `_`: an IPv6 endpoint `http://[::1]:8890/sparql` writes `__1-3d.html`. |
 | `--color-by` | `file` (default), `type`, `namespace` | What node colours and the legend mean. In `file` mode edges also take the colour of the file asserting them. A named graph of a TriG or N-Quads file counts as a file. |
 | `--layout` | `auto` (default), `stress`, `force` | `stress` pins every node to a precomputed Kamada-Kawai position, one layout per view (3D and 2D); `force` runs the live simulation. `auto` picks `stress` up to 1000 nodes. |
@@ -101,7 +102,9 @@ notebook behind the badge.
 | `--view` | `3d` (default), `2d` | Starting view. The page has a `3D \| 2D` switch either way, and each view is pinned to its own stress layout. |
 | `--title` | text | Page title. Default: the first source's name (a file's stem, `stdin`, a query file's stem, or the endpoint's host for inline query text). |
 | `--lang` | language tag, default `en` | Preferred language for labels and definitions. Untagged literals rank next; other languages become synonyms on the card. Matched exactly: `--lang en` does not select `@en-GB`. |
-| `--format` | rdflib parser name | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, `trig`, `nquads`, ...). Default: guess from the extension, then try Turtle. |
+| `--format` | rdflib parser name, `csv`, `tsv` | Force a parser for every input (`turtle`, `xml`, `nt`, `json-ld`, `trig`, `nquads`, ...), or read every input as a table (`csv`, `tsv`). Default: guess from the extension, then try Turtle. |
+| `--columns` | `ROLE=HEADER[,...]` | The table column that plays a role when its header is not a known name: `id`, `label`, `type`, `description`, `source`, `target` or `relation` (see "From tables"). Repeatable; applies to every table of the run. |
+| `--base` | IRI | The namespace for table ids that are neither IRIs nor CURIEs. Default `urn:x-ttl3d:`, shown as the prefix `csv` (`csv2` when an input binds `csv` to another namespace). |
 | `--type-links` | flag | Draw `rdf:type` as an edge from each instance to its class instead of listing it on the card only. |
 | `--attribute-preds` | `prefix:local`, full IRI, or `<urn:...>` | Predicates to keep off the picture and show on the card, e.g. `foaf:homepage,rdfs:seeAlso`. Repeatable; wrap a URN or mailto in angle brackets. |
 | `--focus` | `prefix:local`, full IRI, or `<urn:...>` | Keep only this node's neighbourhood (with `--hops`). Repeatable or comma-separated. |
@@ -114,7 +117,8 @@ notebook behind the badge.
 | `--version` | flag | Print `ttl3d <version>` and exit. |
 
 Input formats are guessed from the extension (`.ttl`, `.nt`, `.n3`, `.rdf`,
-`.owl`, `.jsonld`, `.trig`, `.nq`, ...) through rdflib. A quad format (TriG,
+`.owl`, `.jsonld`, `.trig`, `.nq`, ...) through rdflib; `.csv` and `.tsv` files are tables (see
+"From tables"). A quad format (TriG,
 N-Quads, TriX, JSON-LD with named `@graph` blocks) loads every named graph, and
 each named graph is a source like a file: a legend row of its own, named by its
 prefixed IRI (`ex:planets`, or the full IRI when no prefix covers it; the IRI
@@ -146,6 +150,9 @@ source.
   without a further `/` or `#` (so `urn:` vocabularies shorten too), otherwise at the
   last `/` or `#`. Legend keys, the namespace column and local names all use this one
   rule.
+- A reified statement (`rdf:subject`, `rdf:predicate`, `rdf:object`) about a drawn link puts its
+  other properties on the card, under that relation: edge properties. Its triple must be asserted;
+  a statement whose subject is an IRI is still a node as well.
 - Types, edge labels and property names are local names, unless two of those the page shows
   share one: then both show their prefix (FOAF types its classes `owl:Class` and `rdfs:Class`; `dc:title`
   and `dcterms:title`), or the full IRI when their namespace has no prefix.
@@ -219,6 +226,80 @@ A namespace is named by the first source that binds it, so list a file first whe
 prefixes. The answer parses like a file (about 13 s and 2.3 GB per million triples), so let the query
 select the piece: a `VALUES` list or a `LIMIT` keeps an answer small, and `--focus`/`--schema` trim
 further.
+
+## From tables (CSV, TSV, DataFrames)
+
+A property graph exported from Neo4j, Gephi or networkx, or a hand-made spreadsheet, is drawn as it
+is: an edge table, and a node table if there is one. No mapping file: the header says what each
+column is.
+
+```bash
+ttl3d examples/missions.csv examples/mission-links.csv --color-by type -o missions.html
+# 28 nodes, 35 links -> missions.html (view: 3d, layout: stress, labels: node+edge)
+```
+
+A `.csv` or `.tsv` file is a table; `--format csv` (or `tsv`) reads any file, and standard input
+(`-`), as one. A table with source and target columns is an edge table, one with an id column a node
+table, and every other column is a property. Headers are matched in any case; when a table has several
+headers for one role, the first listed here wins and the others are properties:
+
+| Role | Headers |
+|------|---------|
+| id | `id`, `node`, `key`, `:ID`, `_id` |
+| label | `label`, `name`, `title` |
+| type | `type`, `types`, `class`, `category`, `kind`, `:LABEL`, `_labels`, `labels` (several types split on `;`, APOC's `_labels` on `:` as in `:Person:Actor`) |
+| description | `description`, `definition`, `comment` (the card's definition) |
+| source | `source`, `src`, `from`, `start`, `subject`, `head`, `:START_ID`, `_start` |
+| target | `target`, `dst`, `to`, `end`, `object`, `tail`, `:END_ID`, `_end` |
+| relation | `relation`, `predicate`, `rel`, `:TYPE`, `_type`, `label`, `type` |
+
+Neo4j's import headers work as written (`personId:ID(Person)`, `:START_ID(Person)`, `born:int`,
+`roles:string[]` split on `;`, `:IGNORE`; the kinds in capitals, as Neo4j writes them, so a header
+such as `rdfs:label` or `dc:type` keeps its RDF meaning). The data types (`born:int`,
+`roles:string[]`) are read in a table that has an `:ID`, `:START_ID` or `:END_ID` column, so RDF
+headers such as `dc:date` keep their meaning. Ids in different ID groups stay different
+nodes, and APOC's one-file export (nodes and relationships in one table) works too. Gephi's edge
+`Label` is the relation and its `Type` (Directed/Undirected) an edge property. Any other header is
+mapped by hand, for every table of the run: `--columns source=from_id,target=to_id`
+(`columns={"source": "from_id"}` in Python); a column you map is not also taken by another role's
+names. The delimiter of a `.csv` (comma, semicolon or tab) is read from the header line; the text must
+be UTF-8, and a quote left open is an error naming its line rather than a cell that swallows the rest
+of the file.
+
+- **Ids.** `<urn:isbn:0441013597>`, or anything with `://`, is that IRI. `ex:Dune` is a CURIE when an
+  RDF file of the same run binds `ex`, so a table can add edges between an ontology's nodes;
+  `Person:1` stays a plain id when no file binds `Person`. rdflib binds its well-known prefixes
+  (`schema`, `foaf`, `dc`, `dcterms`, `org`, `time`, ...) on every RDF file it reads, so with an RDF
+  file in the run those CURIEs resolve too; in a table-only run they are plain ids. Any other id becomes `urn:x-ttl3d:<id>`
+  (`--base` picks another namespace), shown with the prefix `csv` (`csv2` when an input already uses
+  `csv` for something else): `--focus csv:voyager2`. A minted id is percent-encoded, so `--focus` names an id with a space as
+  `csv:New%20York` (the card's IRI shows the form to use). Every
+  table of a run shares these ids, so a node table and an edge table meet, and a node keeps its id
+  as its label unless a node table names it.
+- **Edges.** An edge row draws `source relation target`; without a relation the edge is `related`.
+  Relations, types and property names follow the id rules, with spaces as `_` (`operated by` reads
+  `operated_by`).
+- **Edge properties.** The other cells of an edge row show on the card of both ends, under the
+  relation row: `kind flyby · year 1979`, followed by the sources that hold them when the page has
+  several, as relation rows do. They are stored the RDF way, as a reified statement
+  (`rdf:Statement`), and an RDF file that reifies its edges gets the same lines on its cards.
+
+In Python a DataFrame is a table too. ttl3d reads it through `to_csv`, so pandas is never imported
+and never required; a named index (`set_index("id")`) counts as a column. Read the files as text
+(`dtype=str`), or pandas turns a year with gaps into `1969.0`:
+
+```python
+import pandas as pd, ttl3d
+
+missions = pd.read_csv("examples/missions.csv", dtype=str)
+links = pd.read_csv("examples/mission-links.csv", dtype=str)
+ttl3d.show([("missions", missions), ("mission-links", links)], color_by="type")
+```
+
+Measured on 100,000 edge rows between 20,000 nodes: 1.3 s to load and 1.7 s to build without
+property columns (0.5 GB), 7.0 s and 4.6 s with two of them (1.6 GB), since every row with properties
+becomes a reified statement. A graph that size is far past the stress layout's reach: slice it with
+`--focus`.
 
 ## In the page
 

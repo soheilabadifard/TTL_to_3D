@@ -1,0 +1,29 @@
+id,name,type,launched,description
+nasa,NASA,Agency,,United States space agency
+esa,ESA,Agency,,European Space Agency
+jaxa,JAXA,Agency,,Japan Aerospace Exploration Agency
+cnsa,CNSA,Agency,,China National Space Administration
+apollo11,Apollo 11,Mission,1969,The first crewed landing on the Moon
+voyager1,Voyager 1,Mission,1977,
+voyager2,Voyager 2,Mission,1977,The only spacecraft to have visited Uranus and Neptune
+galileo,Galileo,Mission,1989,
+cassini,Cassini,Mission,1997,
+huygens,Huygens,Probe,1997,Carried to Saturn by Cassini
+rosetta,Rosetta,Mission,2004,
+philae,Philae,Probe,2004,Carried to its comet by Rosetta
+newhorizons,New Horizons,Mission,2006,
+juno,Juno,Mission,2011,
+curiosity,Curiosity,Mission;Rover,2011,
+hayabusa2,Hayabusa2,Mission,2014,
+change4,Chang'e 4,Mission,2018,The first soft landing on the far side of the Moon
+perseverance,Perseverance,Mission;Rover,2020,
+moon,Moon,Moon,,
+mars,Mars,Planet,,
+jupiter,Jupiter,Planet,,
+saturn,Saturn,Planet,,
+uranus,Uranus,Planet,,
+neptune,Neptune,Planet,,
+titan,Titan,Moon,,
+pluto,Pluto,DwarfPlanet,,
+67p,67P/Churyumov–Gerasimenko,Comet,,
+ryugu,Ryugu,Asteroid,,

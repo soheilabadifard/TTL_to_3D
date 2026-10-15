@@ -204,3 +204,19 @@ def test_describe_names_what_was_kept():
     assert both == "kept 3 of 12 nodes (schema only; focus ex:Book, 2 hops)"
     unbound = slice.describe(1, 2, [URIRef("http://g/s0")], 0, False, {})
     assert unbound == "kept 1 of 2 nodes (focus http://g/s0, 0 hops)"
+
+
+T = "urn:x-ttl3d:"
+
+
+def test_a_slice_keeps_the_edge_properties_of_the_links_it_keeps(people, knows):
+    ds = load.load([people, knows])
+    cut = slice.select(ds, focus=[URIRef(T + "carol")], hops=1).dataset
+    data = graph.build(cut)
+    assert sorted(n["id"] for n in data["nodes"]) == [T + "alice", T + "carol"]
+    assert all("statements" not in l for l in data["links"])        # carol knows alice: no properties
+    cut = slice.select(ds, focus=[URIRef(T + "alice")], hops=0).dataset
+    assert not any(isinstance(s, BNode) for s in cut.merged.subjects())    # alone: no statement survives
+    cut = slice.select(ds, focus=[URIRef(T + "alice")], hops=1).dataset
+    link = next(l for l in graph.build(cut)["links"] if l["target"] == T + "bob")
+    assert link["statements"][0]["props"] == {"since": ["2020"], "weight": ["0.4"]}

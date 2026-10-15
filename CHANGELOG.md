@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.9.0 (2026-10-15)
+
+Tables as sources: CSV, TSV and DataFrames. `ttl3d nodes.csv edges.csv` draws a property graph with no
+conversion step: a table with source and target columns is an edge table, one with an id column a node
+table, and the other columns are properties. Column roles come from header names (in any case;
+Neo4j's import headers, APOC's one-file export and Gephi's edge tables are understood), and
+`--columns source=from_id,...` maps any other header. `--format csv` or `tsv` reads any file, and
+standard input, as a table. In Python, a DataFrame is a table (read through `to_csv`; pandas is
+never imported), and `to_html`, `write` and `show` take `columns=` and `base=`.
+
+An id written as an IRI (`<...>`, `://`) is used as is, `ex:Dune` resolves when an RDF file of the
+same run binds `ex`, and any other id becomes `urn:x-ttl3d:<id>` (`--base` picks the namespace), shown
+with the prefix `csv`. Every table of a run shares the ids, so a node table and an edge table meet,
+and tables mix with RDF files and queries.
+
+Edge properties: the other cells of an edge row show on the card under the relation row, at both
+ends (`kind flyby · year 1979`). They travel as RDF reification (`rdf:Statement`), so an RDF file that
+reifies its edges gets the same lines; a link with no such statement is unchanged in the page's data,
+which adds a `statements` key only where there are some. The demo site has a Space missions page built
+from `examples/missions.csv` and `examples/mission-links.csv`.
+
 ttl3d is on conda-forge: `conda install -c conda-forge ttl3d` (Python 3.11 or newer there; the
 [feedstock](https://github.com/conda-forge/ttl3d-feedstock) follows each PyPI release).
 

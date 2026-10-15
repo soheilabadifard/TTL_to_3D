@@ -1,0 +1,4 @@
+id,name,type,born,description
+alice,Alice,Person,1990,A reader.
+bob,Bob,Person;Author,1985,
+dune,Dune,Book,,
