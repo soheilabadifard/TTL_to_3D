@@ -1,0 +1,1321 @@
+{
+ "nodes": [
+  {
+   "id": "https://example.org/solar#Callisto",
+   "label": "Callisto",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "2410"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Cassini",
+   "label": "Cassini",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "1997"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#CelestialBody",
+   "label": "celestial body",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": "A natural object in space bound by gravity.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Ceres",
+   "label": "Ceres",
+   "types": [
+    "DwarfPlanet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "470"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Charon",
+   "label": "Charon",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "606"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Dawn",
+   "label": "Dawn",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "2007"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Deimos",
+   "label": "Deimos",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "6"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#DwarfPlanet",
+   "label": "dwarf planet",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": "A body orbiting a star in hydrostatic equilibrium that has not cleared its orbit.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Earth",
+   "label": "Earth",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [
+    "Terra"
+   ],
+   "props": {
+    "radiusKm": [
+     "6371"
+    ]
+   },
+   "sources": [
+    {
+     "label": "NASA planetary fact sheets",
+     "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+    }
+   ]
+  },
+  {
+   "id": "https://example.org/solar#Enceladus",
+   "label": "Enceladus",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "252"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Europa",
+   "label": "Europa",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "1561"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Galileo",
+   "label": "Galileo",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "1989"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Ganymede",
+   "label": "Ganymede",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "2634"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Io",
+   "label": "Io",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "1822"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Juno",
+   "label": "Juno",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "2011"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Jupiter",
+   "label": "Jupiter",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "69911"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Luna",
+   "label": "Moon",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [
+    "Luna"
+   ],
+   "props": {
+    "radiusKm": [
+     "1737"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Mars",
+   "label": "Mars",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "3390"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Mercury",
+   "label": "Mercury",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "2440"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Mission",
+   "label": "mission",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": "A robotic spacecraft mission to one or more bodies.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Moon",
+   "label": "moon",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": "A natural satellite of a planet or dwarf planet.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#NasaFactSheets",
+   "label": "NASA planetary fact sheets",
+   "types": [],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "identifier": [
+     "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Neptune",
+   "label": "Neptune",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "24622"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#NewHorizons",
+   "label": "New Horizons",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "2006"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Phobos",
+   "label": "Phobos",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "11"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Planet",
+   "label": "planet",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": "A body orbiting a star that has cleared its orbital neighbourhood.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Pluto",
+   "label": "Pluto",
+   "types": [
+    "DwarfPlanet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "1188"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Saturn",
+   "label": "Saturn",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "58232"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Star",
+   "label": "star",
+   "types": [
+    "Class"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": "A luminous sphere of plasma held together by its own gravity.",
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Sun",
+   "label": "Sun",
+   "types": [
+    "Star"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [
+    "Sol"
+   ],
+   "props": {
+    "radiusKm": [
+     "695700"
+    ]
+   },
+   "sources": [
+    {
+     "label": "NASA planetary fact sheets",
+     "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+    }
+   ]
+  },
+  {
+   "id": "https://example.org/solar#Titan",
+   "label": "Titan",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "2575"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Titania",
+   "label": "Titania",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "789"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Triton",
+   "label": "Triton",
+   "types": [
+    "Moon"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "1353"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Uranus",
+   "label": "Uranus",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "25362"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Venus",
+   "label": "Venus",
+   "types": [
+    "Planet"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "radiusKm": [
+     "6052"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#Voyager2",
+   "label": "Voyager 2",
+   "types": [
+    "Mission"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {
+    "launchYear": [
+     "1977"
+    ]
+   },
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#hasMoon",
+   "label": "has moon",
+   "types": [
+    "ObjectProperty"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#launchYear",
+   "label": "launch year",
+   "types": [
+    "DatatypeProperty"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#orbits",
+   "label": "orbits",
+   "types": [
+    "ObjectProperty"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#radiusKm",
+   "label": "mean radius (km)",
+   "types": [
+    "DatatypeProperty"
+   ],
+   "file": "solar-system",
+   "ns": ":",
+   "group": "solar-system",
+   "definition": null,
+   "alt": [],
+   "props": {},
+   "sources": []
+  },
+  {
+   "id": "https://example.org/solar#visited",
+   "label": "visited",
+   "types": [
+    "ObjectProperty"
+   ],
+   "file": "solar-system-missions",
+   "ns": ":",
+   "group": "solar-system-missions",
+   "definition": null,
+   "alt": [],
+   "props": {},
+   "sources": []
+  }
+ ],
+ "links": [
+  {
+   "source": "https://example.org/solar#Galileo",
+   "target": "https://example.org/solar#Callisto",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Callisto",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Cassini",
+   "target": "https://example.org/solar#Enceladus",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Cassini",
+   "target": "https://example.org/solar#Saturn",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Cassini",
+   "target": "https://example.org/solar#Titan",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#DwarfPlanet",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "subClassOf"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Moon",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "subClassOf"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Planet",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "subClassOf"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Star",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "subClassOf"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#hasMoon",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "domain"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#orbits",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "domain",
+    "range"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#visited",
+   "target": "https://example.org/solar#CelestialBody",
+   "predicates": [
+    "range"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Dawn",
+   "target": "https://example.org/solar#Ceres",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Ceres",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#NewHorizons",
+   "target": "https://example.org/solar#Charon",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Charon",
+   "target": "https://example.org/solar#Pluto",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Deimos",
+   "target": "https://example.org/solar#Mars",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Earth",
+   "target": "https://example.org/solar#Luna",
+   "predicates": [
+    "hasMoon"
+   ],
+   "reverse": [
+    "orbits"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Earth",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Enceladus",
+   "target": "https://example.org/solar#Saturn",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Galileo",
+   "target": "https://example.org/solar#Europa",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Europa",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Galileo",
+   "target": "https://example.org/solar#Ganymede",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Galileo",
+   "target": "https://example.org/solar#Io",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Galileo",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Ganymede",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Io",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Juno",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Jupiter",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Voyager2",
+   "target": "https://example.org/solar#Jupiter",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Mars",
+   "target": "https://example.org/solar#Phobos",
+   "predicates": [
+    "hasMoon"
+   ],
+   "reverse": [
+    "orbits"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Mars",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Mercury",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#visited",
+   "target": "https://example.org/solar#Mission",
+   "predicates": [
+    "domain"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#hasMoon",
+   "target": "https://example.org/solar#Moon",
+   "predicates": [
+    "range"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Neptune",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Neptune",
+   "target": "https://example.org/solar#Triton",
+   "predicates": [
+    "hasMoon"
+   ],
+   "reverse": [
+    "orbits"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Voyager2",
+   "target": "https://example.org/solar#Neptune",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#NewHorizons",
+   "target": "https://example.org/solar#Pluto",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Pluto",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Saturn",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Saturn",
+   "target": "https://example.org/solar#Titan",
+   "predicates": [
+    "hasMoon"
+   ],
+   "reverse": [
+    "orbits"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Voyager2",
+   "target": "https://example.org/solar#Saturn",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#Uranus",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Venus",
+   "target": "https://example.org/solar#Sun",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Titania",
+   "target": "https://example.org/solar#Uranus",
+   "predicates": [
+    "orbits"
+   ],
+   "reverse": [
+    "hasMoon"
+   ],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  },
+  {
+   "source": "https://example.org/solar#Voyager2",
+   "target": "https://example.org/solar#Uranus",
+   "predicates": [
+    "visited"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system-missions"
+   ],
+   "group": "solar-system-missions"
+  },
+  {
+   "source": "https://example.org/solar#hasMoon",
+   "target": "https://example.org/solar#orbits",
+   "predicates": [
+    "inverseOf"
+   ],
+   "reverse": [],
+   "files": [
+    "solar-system"
+   ],
+   "group": "solar-system"
+  }
+ ],
+ "groups": [
+  "solar-system",
+  "solar-system-missions"
+ ],
+ "color_by": "file",
+ "graphs": {}
+}

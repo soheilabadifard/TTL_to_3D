@@ -20,16 +20,24 @@ that pick become synonyms in `alt`, and a definition-slot literal that loses
 its pick stays visible in the property table instead of vanishing. Literal
 `dcterms:source` / `prov:wasDerivedFrom` values land in the property table
 too; only IRI sources appear in the node's `sources` list.
+
+A reified statement (rdf:subject, rdf:predicate, rdf:object) about a drawn link puts its other
+properties on that link as `statements`, each with the sources that hold it, for the card's relation
+rows; tables write their edge properties this way (ttl3d.table), and RDF that uses reification gets
+them too. A link without statements has no such key, so pages of input without reification are
+unchanged.
 """
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 
 from rdflib import Literal, URIRef
 from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
 
+from .iri import NOT_IN_IRI as _NOT_IN_IRI
+from .iri import by_prefix
+from .iri import written as written_iri
 from .load import Dataset, local, namespace_of, split_iri
 
 COLOR_KEYS = ("file", "type", "namespace")
@@ -39,7 +47,7 @@ ATTRIBUTE_PREDS = {RDF.type, OWL.imports, OWL.versionIRI, OWL.priorVersion,
 LABEL_PREDS = (RDFS.label, SKOS.prefLabel)
 DEFINITION_PREDS = (SKOS.definition, RDFS.comment, DCTERMS.description)
 SOURCE_PREDS = (PROV.wasDerivedFrom, DCTERMS.source)
-_NOT_IN_IRI = re.compile(r'[\x00-\x20<>"{}|\\^`]')   # what Turtle's IRIREF excludes; rdflib logs about most
+STATEMENT_PREDS = (RDF.subject, RDF.predicate, RDF.object)
 
 
 @dataclass(frozen=True)
@@ -112,13 +120,34 @@ def _names(iris, prefixes) -> dict:
     return names
 
 
+def _statements(g, is_link) -> dict:
+    """Reified statements about drawn links, as {(s, p, o): [(statement, {property IRI: [objects]})]}. A
+    statement has exactly one rdf:subject, rdf:predicate and rdf:object, all IRIs, and its triple is
+    asserted and drawn; its properties are its other triples but rdf:type, blank-node objects left out.
+    A statement without properties says nothing and is left out."""
+    found = defaultdict(list)
+    for x in set(g.subjects(RDF.subject, None)):
+        ends = [list(g.objects(x, q)) for q in STATEMENT_PREDS]
+        if any(len(e) != 1 or not isinstance(e[0], URIRef) for e in ends):
+            continue
+        triple = tuple(e[0] for e in ends)
+        if triple not in g or not is_link(*triple):
+            continue
+        props = defaultdict(list)
+        for _, q, v in g.triples((x, None, None)):
+            if q not in STATEMENT_PREDS and q != RDF.type and isinstance(v, (Literal, URIRef)):
+                props[q].append(v)
+        if props:
+            found[triple].append((x, props))
+    return found
+
+
 def resolve_terms(terms, ds: Dataset) -> set:
     """Turn 'prefix:local', full IRIs, or '<...>'-wrapped IRIs into URIRefs using the
     dataset's bindings. Angle brackets are the Turtle convention for "this is a full
-    IRI, not a CURIE" -- needed for schemes like urn: or mailto: that have no "://"."""
-    by_prefix: dict = {}
-    for ns, prefix in ds.prefixes.items():
-        by_prefix.setdefault(prefix, ns)
+    IRI, not a CURIE" -- needed for schemes like urn: or mailto: that have no "://". The rule is
+    ttl3d.iri's, shared with the ids of tables; a term it cannot read is an error here."""
+    namespaces = by_prefix(ds.prefixes)
     out = set()
     for term in terms:
         bracketed = term.startswith("<") and term.endswith(">")
@@ -127,14 +156,11 @@ def resolve_terms(terms, ds: Dataset) -> set:
             raise ValueError("an empty term; write a prefixed name such as ex:Dune or a full IRI")
         if (bad := _NOT_IN_IRI.search(written)):              # before URIRef, which would log about it
             raise ValueError(f"{term!r} cannot be an IRI: it contains {bad.group()!r}")
-        if bracketed or "://" in term:
-            out.add(URIRef(written))
-            continue
-        prefix, _, name = term.partition(":")
-        if prefix not in by_prefix:
+        found = written_iri(term, namespaces)
+        if found is None:
             raise ValueError(f"unknown prefix in {term!r}; bind it in an input file, "
                              f"or write the full IRI as <{term}>")
-        out.add(URIRef(by_prefix[prefix] + name))
+        out.add(found)
     return out
 
 
@@ -170,6 +196,12 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
             node_ids.add(o)
             a, b = sorted((s, o), key=str)
             merged_links[(a, b)]["fwd" if s == a else "rev"].add(p)
+    statements = _statements(g, is_link)
+    held_by: dict = defaultdict(list)       # statement -> the sources holding it, in source order
+    for key, fg in ds.graphs.items():
+        for x in set(fg.subjects(RDF.subject, None)):
+            held_by[x].append(key)
+    order = list(ds.graphs)
     type_name = _names({t for n in node_ids for t in g.objects(n, RDF.type)
                         if isinstance(t, URIRef) and t != OWL.NamedIndividual}, prefixes)
 
@@ -224,17 +256,37 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     # only the predicates the page shows can clash: rdf:type (unless drawn) and the labels never do
     pred_name = _names({p for d in merged_links.values() for ps in d.values() for p in ps}
-                       | {p for n in nodes for p in n["props"]}, prefixes)
+                       | {p for n in nodes for p in n["props"]}
+                       | {q for found in statements.values() for _, props in found for q in props}, prefixes)
     for n in nodes:
         n["props"] = dict(sorted((pred_name[p], sorted(v)) for p, v in n["props"].items()))
+
+    def shown(v) -> str:                  # a statement's value: a literal's text, an IRI by its label
+        if isinstance(v, Literal):
+            return str(v)
+        return labels.get(v) or _first(g, v, LABEL_PREDS, lang) or str(v)
 
     links = []
     for (a, b), d in sorted(merged_links.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
         src, tgt, fwd, rev = (a, b, d["fwd"], d["rev"]) if d["fwd"] else (b, a, d["rev"], d["fwd"])
         files = link_files.get((a, b), [])
-        links.append({"source": str(src), "target": str(tgt), "predicates": sorted(pred_name[p] for p in fwd),
-                      "reverse": sorted(pred_name[p] for p in rev), "files": files,
-                      "group": (files[0] if files else "?") if color_by == "file" else None})
+        link = {"source": str(src), "target": str(tgt), "predicates": sorted(pred_name[p] for p in fwd),
+                "reverse": sorted(pred_name[p] for p in rev), "files": files,
+                "group": (files[0] if files else "?") if color_by == "file" else None}
+        # one entry per distinct (direction, predicate, properties) with every source holding one: sorted,
+        # so no blank-node id or store order reaches the page, and identical rows show once
+        said: dict = {}
+        for reverse, x, y, preds in ((False, src, tgt, fwd), (True, tgt, src, rev)):
+            for p in preds:
+                for st, props in statements.get((x, p, y), ()):
+                    values = tuple(sorted((pred_name[q], tuple(sorted(shown(v) for v in vs)))
+                                          for q, vs in props.items()))
+                    said.setdefault((reverse, pred_name[p], values), set()).update(held_by[st])
+        if said:
+            link["statements"] = [{"predicate": p, "reverse": r, "props": {q: list(vs) for q, vs in props},
+                                   "files": sorted(files, key=order.index)}
+                                  for (r, p, props), files in sorted(said.items())]
+        links.append(link)
 
     groups = {n["group"] for n in nodes}
     if color_by == "file":
