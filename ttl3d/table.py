@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 import io
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -66,10 +66,10 @@ class Column:
     array: bool = False
 
 
-def column(header: str) -> Column:
+def column(header: str, neo4j: bool = False) -> Column:
     """One header cell, with Neo4j's `name:KIND(group)[]` read when KIND is a Neo4j kind, in upper case as
-    Neo4j writes it (so `rdfs:label` and `dc:type` stay CURIEs), or a data type in any case; otherwise
-    the colon belongs to the name (`foaf:name`)."""
+    Neo4j writes it (so `rdfs:label` and `dc:type` stay CURIEs), or, in a Neo4j table only (`neo4j`),
+    a data type in any case; otherwise the colon belongs to the name (`foaf:name`, `dc:date`)."""
     m = _NEO4J.fullmatch(header)
     if m:
         kind = m["kind"].lower()
@@ -78,7 +78,7 @@ def column(header: str) -> Column:
             if kind == "ignore":
                 return Column(header, m["name"], None)
             return Column(header, m["name"], f":{kind}", m["group"] or None)
-        if kind in _NEO4J_TYPES and m["group"] is None:
+        if neo4j and kind in _NEO4J_TYPES and m["group"] is None:
             name = m["name"].strip()
             return Column(header, name, name.lower() or None, None, bool(m["array"]))
     return Column(header, header, header.lower() or None)
@@ -122,10 +122,21 @@ def _delimiter(line: str) -> str:
     return next(d for d in counts if counts[d] == best) if best else ","
 
 
+def _is_neo4j(cells: list[str]) -> bool:
+    """A Neo4j import file: a node file has an `:ID` column, a relationship file `:START_ID` and `:END_ID`
+    (upper case, as in `column`)."""
+    for cell in cells:
+        m = _NEO4J.fullmatch(cell)
+        if m and m["kind"].isupper() and m["kind"].lower() in ("id", "start_id", "end_id"):
+            return True
+    return False
+
+
 def parse(text: str, name: str, delimiter: str | None = None) -> Table:
     """A table from text; `delimiter` None guesses it from the header line."""
     if delimiter is None:
-        first = next((line for line in text.splitlines() if line.strip()), "")
+        # lazily: splitlines() would copy the whole file just to find the header
+        first = next((line.rstrip("\r\n") for line in io.StringIO(text, newline="") if line.strip()), "")
         delimiter = _delimiter(first)
     # strict: an unclosed quote is an error, not a cell that swallows the rest of the file
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, skipinitialspace=True,
@@ -140,7 +151,8 @@ def parse(text: str, name: str, delimiter: str | None = None) -> Table:
             if not any(cells):                  # a blank line, or a row of empty cells (",,,")
                 continue
             if columns is None:
-                columns = [column(c) for c in cells]
+                neo4j = _is_neo4j(cells)
+                columns = [column(c, neo4j) for c in cells]
                 continue
             if len(cells) > len(columns):
                 if any(cells[len(columns):]):
@@ -306,12 +318,14 @@ def _values(cell: str, col: Column) -> list[str]:
     return [v for v in (part.strip() for part in cell.split(";")) if v] if col.array else [cell]
 
 
-def to_graphs(tables: list[Table], prefixes: Mapping[str, str],
-              base: str) -> tuple[list[Graph], dict[URIRef, int]]:
+def to_graphs(tables: list[Table], prefixes: Mapping[str, str], base: str,
+              said: Callable[[URIRef], bool] | None = None) -> tuple[list[Graph], dict[URIRef, int]]:
     """One graph per table, built together: ids meet across tables, and a minted node that no node
     row labels gets its id as rdfs:label from the table holding its first node row, else from the
     first table that mentions it. Also returns the IRI and CURIE ids whose node rows said nothing
-    (IRI -> table index), which the loader still makes nodes of."""
+    (IRI -> table index), which the loader still makes nodes of. `said(iri)` tells whether an RDF source
+    already has that IRI as a subject: such a node keeps the label and the owner that source gives it,
+    so it gets no automatic label."""
     mint = _Minter(prefixes, base)
     graphs = [Graph() for _ in tables]
     bare: dict[URIRef, int] = {}
@@ -375,6 +389,6 @@ def to_graphs(tables: list[Table], prefixes: Mapping[str, str],
                     if q in _LABELS:
                         labelled.add(n)
     for n, text in raw.items():
-        if n not in labelled:
+        if n not in labelled and not (said and said(n)):
             graphs[home.get(n, seen[n])].add((n, RDFS.label, Literal(text)))
     return graphs, bare

@@ -247,7 +247,7 @@ headers for one role, the first listed here wins and the others are properties:
 |------|---------|
 | id | `id`, `node`, `key`, `:ID`, `_id` |
 | label | `label`, `name`, `title` |
-| type | `type`, `types`, `class`, `category`, `kind`, `:LABEL`, `_labels`, `labels` (several types split on `;`) |
+| type | `type`, `types`, `class`, `category`, `kind`, `:LABEL`, `_labels`, `labels` (several types split on `;`, APOC's `_labels` on `:` as in `:Person:Actor`) |
 | description | `description`, `definition`, `comment` (the card's definition) |
 | source | `source`, `src`, `from`, `start`, `subject`, `head`, `:START_ID`, `_start` |
 | target | `target`, `dst`, `to`, `end`, `object`, `tail`, `:END_ID`, `_end` |
@@ -255,7 +255,9 @@ headers for one role, the first listed here wins and the others are properties:
 
 Neo4j's import headers work as written (`personId:ID(Person)`, `:START_ID(Person)`, `born:int`,
 `roles:string[]` split on `;`, `:IGNORE`; the kinds in capitals, as Neo4j writes them, so a header
-such as `rdfs:label` or `dc:type` keeps its RDF meaning), ids in different ID groups stay different
+such as `rdfs:label` or `dc:type` keeps its RDF meaning). The data types (`born:int`,
+`roles:string[]`) are read in a table that has an `:ID`, `:START_ID` or `:END_ID` column, so RDF
+headers such as `dc:date` keep their meaning. Ids in different ID groups stay different
 nodes, and APOC's one-file export (nodes and relationships in one table) works too. Gephi's edge
 `Label` is the relation and its `Type` (Directed/Undirected) an edge property. Any other header is
 mapped by hand, for every table of the run: `--columns source=from_id,target=to_id`
@@ -266,9 +268,12 @@ of the file.
 
 - **Ids.** `<urn:isbn:0441013597>`, or anything with `://`, is that IRI. `ex:Dune` is a CURIE when an
   RDF file of the same run binds `ex`, so a table can add edges between an ontology's nodes;
-  `Person:1` stays a plain id when no file binds `Person`. Any other id becomes `urn:x-ttl3d:<id>`
+  `Person:1` stays a plain id when no file binds `Person`. rdflib binds its well-known prefixes
+  (`schema`, `foaf`, `dc`, `dcterms`, `org`, `time`, ...) on every RDF file it reads, so with an RDF
+  file in the run those CURIEs resolve too; in a table-only run they are plain ids. Any other id becomes `urn:x-ttl3d:<id>`
   (`--base` picks another namespace), shown with the prefix `csv` (`csv2` when an input already uses
-  `csv` for something else): `--focus csv:voyager2`. Every
+  `csv` for something else): `--focus csv:voyager2`. A minted id is percent-encoded, so `--focus` names an id with a space as
+  `csv:New%20York` (the card's IRI shows the form to use). Every
   table of a run shares these ids, so a node table and an edge table meet, and a node keeps its id
   as its label unless a node table names it.
 - **Edges.** An edge row draws `source relation target`; without a relation the edge is `related`.

@@ -26,6 +26,9 @@
   - Typed literals: Neo4j data types (`born:int`, `date`) are dropped and every value is text; they
     could become `xsd:` datatypes, which matters once the slice is written out as RDF.
   - Edge properties in the link hover text and edge labels, not only on the card.
+  - Minted vocabulary is percent-encoded (`AI/ML` shows as `AI%2FML` in the card, edge labels and the
+    type legend) and `--focus` needs the encoded form: decode for display in the minted namespace, and
+    accept the raw id in `--focus csv:...`.
   - A likely missing Neo4j ID group: when an edge endpoint without a group (`:START_ID`) matches no
     node row while a node table of the run uses ID groups (`:ID(Person)`) and has that raw id, warn
     on stderr through `notice`, naming the column. Today the two sides mint different IRIs and a

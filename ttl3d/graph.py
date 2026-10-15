@@ -285,9 +285,10 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
                                           for q, vs in props.items()))
                     said.setdefault((reverse, pred_name[p], values), set()).update(held_by[st])
         if said:
-            link["statements"] = [{"predicate": p, "reverse": r, "props": {q: list(vs) for q, vs in props},
-                                   "files": sorted(files, key=order.index)}
-                                  for (r, p, props), files in sorted(said.items())]
+            link["statements"] = [{"predicate": pred, "reverse": r,
+                                   "props": {q: list(vs) for q, vs in values},
+                                   "files": sorted(holders, key=order.index)}
+                                  for (r, pred, values), holders in sorted(said.items())]
         links.append(link)
 
     groups = {n["group"] for n in nodes}

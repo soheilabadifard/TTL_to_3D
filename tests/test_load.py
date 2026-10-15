@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDFS
 
 from ttl3d import graph, load, sparql
 
@@ -633,3 +634,18 @@ def test_the_table_prefix_steps_aside_when_an_input_binds_csv_elsewhere(tmp_path
     ttl.write_text("@prefix csv: <http://example.org/csv-spec#> .\ncsv:a csv:p csv:b .\n", encoding="utf-8")
     prefixes = load.load([ttl, people]).prefixes
     assert prefixes["http://example.org/csv-spec#"] == "csv" and prefixes[TABLE_NS] == "csv2"
+
+
+def test_an_automatic_label_leaves_a_node_an_rdf_file_describes_alone(tmp_path, library):
+    ex = "http://example.org/library#"
+    edges = tmp_path / "edges.csv"
+    edges.write_text("source,target\nHerbert,Dune\n", encoding="utf-8")
+    ds = load.load([edges, library], base=ex)
+    made = ds.graphs["edges"]
+    assert (URIRef(ex + "Herbert"), RDFS.label, None) not in made
+    assert (URIRef(ex + "Dune"), RDFS.label, None) not in made
+    nodes = {n["id"]: n for n in graph.build(ds)["nodes"]}
+    # the edge row itself makes the table the subject of Herbert's edge; the label stays the RDF file's
+    assert nodes[ex + "Herbert"]["label"] == "Frank Herbert"
+    # Dune is only the edge's target here, so the table never owned it
+    assert nodes[ex + "Dune"]["file"] == "library"

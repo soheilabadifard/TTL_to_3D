@@ -371,14 +371,17 @@ def load(sources: Sources, fmt: str | None = None, *, notice: Callable[[str], No
                 prefixes.setdefault(str(ns), prefix)
     if tables:                    # every RDF prefix is known now: CURIE ids resolve through them
         table.check_mapped(columns, [t for _, t in tables])
+        slots = {i for i, _ in tables}
+        rdf = [g for i, (_, d, ng) in enumerate(parts) if i not in slots for g in (d, *ng.values())]
+
+        def said(iri):                          # does an RDF source of the run describe this IRI?
+            return any((iri, None, None) in g for g in rdf)
         with _table_errors():
             for _, t in tables:
                 table.classify(t, columns)
-            made, bare = table.to_graphs([t for _, t in tables], prefixes, base)
-        slots = {i for i, _ in tables}
-        rdf = [g for i, (_, d, ng) in enumerate(parts) if i not in slots for g in (d, *ng.values())]
+            made, bare = table.to_graphs([t for _, t in tables], prefixes, base, said)
         for iri, ti in bare.items():            # an IRI id whose row says nothing is a node all the same
-            if not any((iri, None, None) in g for g in rdf):
+            if not said(iri):
                 made[ti].add((iri, RDFS.label, Literal(local(iri, prefixes))))
         for (i, _), g in zip(tables, made):
             parts[i] = (parts[i][0], g, {})

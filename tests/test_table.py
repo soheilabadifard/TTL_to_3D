@@ -102,8 +102,20 @@ def test_extra_cells_that_are_empty_lose_nothing_and_are_allowed():
     ("", "", None, None, False),                               # an empty header is ignored
 ])
 def test_headers_are_read_with_neo4j_import_syntax(header, name, key, group, array):
-    c = table.column(header)
+    c = table.column(header, neo4j=True)
     assert (c.name, c.key, c.group, c.array) == (name, key, group, array)
+
+
+def test_data_types_are_read_only_in_a_neo4j_table():
+    dc = "http://purl.org/dc/terms/"
+    t = csv("id,dc:date,start:datetime,born:int\nx,2020,a,1990\n")
+    assert not t.is_edges and "source" not in t.roles
+    (g,), _ = table.to_graphs([t], {dc: "dc"}, B)
+    assert set(g.predicate_objects(m("x"))) >= {
+        (URIRef(dc + "date"), Literal("2020")), (m("start:datetime"), Literal("a")),
+        (m("born:int"), Literal("1990"))}
+    g, = graphs("personId:ID,born:int\n1,1964\n")
+    assert (m("1"), m("born"), Literal("1964")) in g
 
 
 def test_rdf_names_as_headers_mean_what_they_say():
