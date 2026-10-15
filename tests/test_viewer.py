@@ -547,3 +547,38 @@ def test_a_click_still_leaves_the_focus_where_it_was(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_edge_properties_show_under_their_relation_rows_on_both_cards(tmp_path):
+    (tmp_path / "e.csv").write_text("source,target,relation,since,note\n"
+                                    "a,b,knows,2020,<i>old</i>\nb,a,knows,2021,\na,b,likes,,\na,c,met,,\n",
+                                    encoding="utf-8")
+    out = tmp_path / "e.html"
+    _run_cli(str(tmp_path / "e.csv"), "-o", str(out), "--view", "2d")
+    (tmp_path / "a.csv").write_text("source,target,relation,since\nx,y,knows,2020\n", encoding="utf-8")
+    (tmp_path / "b.csv").write_text("source,target,relation,since\nx,y,knows,2021\nx,y,knows,2020\n",
+                                    encoding="utf-8")
+    two = tmp_path / "two.html"
+    _run_cli(str(tmp_path / "b.csv"), str(tmp_path / "a.csv"), "-o", str(two), "--view", "2d")
+    open_card = ("Graph.onNodeClick()(Graph.graphData().nodes.find(n => n.label === '{}'), "
+                 "new MouseEvent('click'))")
+    said = ("[...document.querySelectorAll('#detail .rel')]"
+            ".map(r => [...r.querySelectorAll('.said')].map(s => s.textContent))")
+    errors = []
+    with pw.sync_playwright() as p:
+        browser, page = _open(p, out.as_uri(), errors)
+        try:
+            page.evaluate(open_card.format("a"))
+            # outgoing "knows, likes → b" (two predicates: each line names its own), "met → c" (no
+            # properties), then incoming "b knows →", which carries the other direction's statement
+            assert page.evaluate(said) == [["knows: note <i>old</i> · since 2020"], [], ["since 2021"]]
+            assert page.evaluate("document.querySelectorAll('#detail .said i').length") == 0   # text only
+            page.evaluate(open_card.format("b"))
+            assert page.evaluate(said) == [["since 2021"], ["knows: note <i>old</i> · since 2020"]]
+            page.goto(two.as_uri())                 # two sources: each line names the ones holding it
+            page.wait_for_function("document.querySelectorAll('.row.grp').length > 0")
+            page.evaluate(open_card.format("x"))
+            assert page.evaluate(said) == [["since 2020 [b, a]", "since 2021 [b]"]]
+        finally:
+            browser.close()
+    assert errors == []
