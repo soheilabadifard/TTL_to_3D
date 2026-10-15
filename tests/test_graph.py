@@ -295,6 +295,10 @@ def test_resolve_terms_accepts_angle_bracketed_iris_without_a_scheme_separator(l
     assert "<urn:isbn:0451450523>" in str(e.value)
 
 
+def test_a_bare_prefix_still_names_its_namespace(library):
+    assert graph.resolve_terms(["ex"], load.load_files([library])) == {URIRef(EX)}
+
+
 def test_iri_valued_attribute_predicates_show_on_the_card(tmp_path):
     ttl = tmp_path / "iri.ttl"
     ttl.write_text("@prefix ex: <http://example.org/c#> .\n"

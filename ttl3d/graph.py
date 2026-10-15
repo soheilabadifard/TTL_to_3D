@@ -157,6 +157,8 @@ def resolve_terms(terms, ds: Dataset) -> set:
         if (bad := _NOT_IN_IRI.search(written)):              # before URIRef, which would log about it
             raise ValueError(f"{term!r} cannot be an IRI: it contains {bad.group()!r}")
         found = written_iri(term, namespaces)
+        if found is None and term in namespaces:    # a bare prefix names its namespace, as before 0.9.0
+            found = URIRef(namespaces[term])
         if found is None:
             raise ValueError(f"unknown prefix in {term!r}; bind it in an input file, "
                              f"or write the full IRI as <{term}>")
