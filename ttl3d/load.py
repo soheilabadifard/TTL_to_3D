@@ -1,14 +1,21 @@
-"""Parse one or more RDF sources (files, standard input, in-memory rdflib graphs and datasets) into a
-merged graph that remembers which source said what. A named graph of a quad format (TriG, N-Quads,
-TriX, JSON-LD with named @graph blocks) is a source of its own, keyed by its prefixed IRI.
+"""Parse one or more RDF sources (files, standard input, in-memory rdflib graphs and datasets) and
+tables (CSV/TSV files, standard input, DataFrames) into a merged graph that remembers which source
+said what. A named graph of a quad format (TriG, N-Quads, TriX, JSON-LD with named @graph blocks) is a
+source of its own, keyed by its prefixed IRI.
 
     path / bytes --rdflib Dataset.parse--> rdflib Dataset --_split--> default graph (+ blank-node graphs)
     rdflib.Dataset ---------------------------------------_split--> named graphs {IRI: Graph}
     rdflib.Graph -------------------------------------------------> used as is, no named graphs
     sparql.Query --sparql.fetch--> bytes --parse, base = endpoint--> one key (named graphs folded in)
+    .csv/.tsv path, stdin table, DataFrame --table.read_*--> Table --> its slot, filled further down
          |                                    one (name, default, named) part per source, in input order
          v
     prefixes: namespace -> prefix from every source, first binding wins   (collected before any key)
+         |
+         v
+    tables, all together (table.classify, table.to_graphs): one Graph per table into its slot; ids
+    shared across tables; CURIE ids through the prefixes above; the base bound to csv (csv2, ... when
+    an input binds csv elsewhere); an IRI id whose row says nothing gets a label, so it is a node
          |
          v
     keys, source by source:   default graph -> the source name        (~2 on a clash; no key when it
@@ -29,15 +36,17 @@ import pyexpat
 import time
 import warnings
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from rdflib import Dataset as RdfDataset
-from rdflib import Graph, URIRef
+from rdflib import Graph, Literal, URIRef
 from rdflib.graph import DATASET_DEFAULT_GRAPH_ID
+from rdflib.namespace import RDFS
 from rdflib.util import guess_format
 
-from . import sparql
+from . import sparql, table
 
 
 class LoadError(ValueError):
@@ -233,25 +242,29 @@ def curie(iri: URIRef, prefixes: Mapping[str, str]) -> str:
     return f"{prefixes[ns]}:{name}" if name and ns in prefixes else str(iri)
 
 
-# one source; a tuple is always a (name, item) pair, never two sources
-Source = str | os.PathLike | Graph | sparql.Query | tuple[str, str | os.PathLike | Graph | sparql.Query]
+# one source; a tuple is always a (name, item) pair, never two sources. A DataFrame (anything with
+# to_csv and columns) is a source too; it has no type to name here without importing pandas
+Source = (str | os.PathLike | Graph | sparql.Query | table.Table
+          | tuple[str, str | os.PathLike | Graph | sparql.Query | table.Table])
 
 _NOT_A_SOURCE = (
-    "a source is a path, an rdflib.Graph, a sparql.Query, a (name, source) pair or a "
+    "a source is a path, an rdflib.Graph, a sparql.Query, a DataFrame, a (name, source) pair or a "
     "mapping of names to those, not {}"
 )
 
 
 def _items(sources) -> list:
-    """One source or an iterable of sources, as a list. A str, a path, a Graph, a Query or a tuple is one
-    source: a tuple is always a (name, item) pair, never two sources; several go in a list. A
-    mapping names its values: {"planets": g} is the same as [("planets", g)]. A set is refused: the
-    order of the sources names the page and orders the legend, and a set's order follows the hash seed."""
+    """One source or an iterable of sources, as a list. A str, a path, a Graph, a Query, a DataFrame or a
+    tuple is one source: a tuple is always a (name, item) pair, never two sources; several go in a
+    list (a DataFrame iterates its column names, so it is recognised first). A mapping names its
+    values: {"planets": g} is the same as [("planets", g)]. A set is refused: the order of the sources
+    names the page and orders the legend, and a set's order follows the hash seed."""
     if isinstance(sources, Mapping):
         return list(sources.items())
     if isinstance(sources, (set, frozenset)):
         raise TypeError("a set of sources has no order; pass a list")
-    if isinstance(sources, (str, os.PathLike, Graph, tuple, sparql.Query)):
+    if (isinstance(sources, (str, os.PathLike, Graph, tuple, sparql.Query, table.Table))
+            or table.is_frame(sources)):
         return [sources]
     try:
         return list(sources)
@@ -262,17 +275,18 @@ def _items(sources) -> list:
 def _named(item) -> tuple:
     if isinstance(item, tuple):
         if len(item) != 2 or not isinstance(item[0], str):
-            raise TypeError(f"a named source is a (name, path, Graph or Query) pair, got {item!r}")
+            raise TypeError(f"a named source is a (name, path, Graph, Query or DataFrame) pair, "
+                            f"got {item!r}")
         return item
     return None, item
 
 
 # what load() and the API accept: one source, several, or a mapping of name to source
-Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph | sparql.Query]
+Sources = Source | Iterable[Source] | Mapping[str, str | os.PathLike | Graph | sparql.Query | table.Table]
 
 
-def load(sources: Sources, fmt: str | None = None, *,
-         notice: Callable[[str], None] | None = None) -> Dataset:
+def load(sources: Sources, fmt: str | None = None, *, notice: Callable[[str], None] | None = None,
+         columns: Mapping[str, str] | None = None, base: str | None = None) -> Dataset:
     """Parse and merge paths and in-memory graphs, keeping which source said what.
 
     A path is named by its stem, an rdflib.Graph by its (name, graph) pair or "graph", an
@@ -285,14 +299,31 @@ def load(sources: Sources, fmt: str | None = None, *,
     media type against the endpoint as base, under the endpoint's host unless paired; its named
     graphs fold into that one key and its PREFIX lines bind before the answer's own; `notice` gets
     one "fetched N triples from HOST in S s" line per query. `fmt` forces one parser for every
-    path, as --format does."""
+    path, as --format does; "csv" and "tsv" read every path as a table.
+
+    A table (a .csv or .tsv path, a DataFrame, or a table the CLI read from standard input) is read
+    in input order but classified and converted only after every other source is parsed, all tables
+    together (see ttl3d.table): ids may be CURIEs of the RDF sources' prefixes, and ids meet across
+    tables. `columns` maps roles to headers for every table, and each header it names must be in some
+    table; minted ids go under `base`, bound to the prefix `csv` (csv2, ... when an input binds csv to
+    another namespace)."""
+    columns = table.check_columns(columns)
+    base = table.check_base(base)
+    tables: list[tuple[int, table.Table]] = []      # (index into parts, table), converted at the end
     files: list[Path] = []
     names: list[str] = []
     prefixes: dict[str, str] = {}
     parts: list[tuple[str, Graph, dict[URIRef, Graph]]] = []    # (name, default graph, named graphs)
     for item in _items(sources):
         name, obj = _named(item)
-        if isinstance(obj, sparql.Query):                        # checked when it was built
+        bound: Graph | None
+        if isinstance(obj, table.Table) or table.is_frame(obj):
+            key = name or (obj.name if isinstance(obj, table.Table) else "table")
+            with _table_errors():
+                t = obj if isinstance(obj, table.Table) else table.read_frame(obj, key)
+            tables.append((len(parts), t))
+            bound, default, named_graphs = None, Graph(), {}
+        elif isinstance(obj, sparql.Query):                        # checked when it was built
             key, started = name or sparql.host(obj.endpoint), time.perf_counter()
             body, media = sparql.fetch(obj)
             rds = parse_data(body, media or "text/turtle", key, base=obj.endpoint)
@@ -319,16 +350,45 @@ def load(sources: Sources, fmt: str | None = None, *,
                 problem = (f"{f} is a directory, not a file" if f.is_dir() else
                            f"{f} is not a regular file" if f.exists() else f"{f}: no such file")
                 raise FileNotFoundError(problem)
-            rds = _parse(f, fmt)
-            key, bound = name or f.stem, rds
-            default, named_graphs = _split(rds)
+            key = name or f.stem
+            tfmt = table.table_format(f, fmt)
+            if tfmt:
+                with _table_errors():
+                    t = table.read_path(f, tfmt)
+                tables.append((len(parts), t))
+                bound, default, named_graphs = None, Graph(), {}
+            else:
+                rds = _parse(f, fmt)
+                bound = rds
+                default, named_graphs = _split(rds)
             files.append(f)
         else:
             raise TypeError(_NOT_A_SOURCE.format(type(obj).__name__))
         names.append(key)
         parts.append((key, default, named_graphs))
-        for prefix, ns in bound.namespaces():
-            prefixes.setdefault(str(ns), prefix)
+        if bound is not None:
+            for prefix, ns in bound.namespaces():
+                prefixes.setdefault(str(ns), prefix)
+    if tables:                    # every RDF prefix is known now: CURIE ids resolve through them
+        table.check_mapped(columns, [t for _, t in tables])
+        with _table_errors():
+            for _, t in tables:
+                table.classify(t, columns)
+            made, bare = table.to_graphs([t for _, t in tables], prefixes, base)
+        slots = {i for i, _ in tables}
+        rdf = [g for i, (_, d, ng) in enumerate(parts) if i not in slots for g in (d, *ng.values())]
+        for iri, ti in bare.items():            # an IRI id whose row says nothing is a node all the same
+            if not any((iri, None, None) in g for g in rdf):
+                made[ti].add((iri, RDFS.label, Literal(local(iri, prefixes))))
+        for (i, _), g in zip(tables, made):
+            parts[i] = (parts[i][0], g, {})
+        if base not in prefixes:                # an input that binds the base itself keeps its prefix
+            taken, prefix, n = set(prefixes.values()), table.PREFIX, 2
+            while prefix in taken:              # an input's csv: means something else; take csv2, ...
+                prefix, n = f"{table.PREFIX}{n}", n + 1
+            prefixes[base] = prefix
+    elif columns:
+        raise ValueError("columns were given, but no source is a table")
     # keys are assigned only now, so a prefix bound by a later source shortens every graph name
     graphs: dict[str, Graph] = {}
     named: dict[str, URIRef] = {}       # key -> graph IRI (Dataset.named)
@@ -350,6 +410,15 @@ def load(sources: Sources, fmt: str | None = None, *,
         for triple in g:
             merged.add(triple)
     return Dataset(files, graphs, merged, prefixes, names, named)
+
+
+@contextmanager
+def _table_errors():
+    """A table's TableError, re-raised as the loader's LoadError."""
+    try:
+        yield
+    except table.TableError as e:
+        raise LoadError(str(e)) from None
 
 
 def load_files(paths: Iterable[str | Path], fmt: str | None = None) -> Dataset:
