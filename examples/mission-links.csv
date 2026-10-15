@@ -1,0 +1,36 @@
+source,target,relation,year,kind
+apollo11,nasa,operated by,,
+voyager1,nasa,operated by,,
+voyager2,nasa,operated by,,
+galileo,nasa,operated by,,
+cassini,nasa,operated by,,
+huygens,esa,operated by,,
+rosetta,esa,operated by,,
+philae,esa,operated by,,
+newhorizons,nasa,operated by,,
+juno,nasa,operated by,,
+curiosity,nasa,operated by,,
+hayabusa2,jaxa,operated by,,
+change4,cnsa,operated by,,
+perseverance,nasa,operated by,,
+cassini,huygens,carried,,
+rosetta,philae,carried,,
+apollo11,moon,visited,1969,landing
+voyager1,jupiter,visited,1979,flyby
+voyager1,saturn,visited,1980,flyby
+voyager2,jupiter,visited,1979,flyby
+voyager2,saturn,visited,1981,flyby
+voyager2,uranus,visited,1986,flyby
+voyager2,neptune,visited,1989,flyby
+galileo,jupiter,visited,1995,orbit
+cassini,saturn,visited,2004,orbit
+huygens,titan,visited,2005,landing
+rosetta,67p,visited,2014,orbit
+philae,67p,visited,2014,landing
+newhorizons,jupiter,visited,2007,flyby
+newhorizons,pluto,visited,2015,flyby
+juno,jupiter,visited,2016,orbit
+curiosity,mars,visited,2012,landing
+hayabusa2,ryugu,visited,2018,rendezvous
+change4,moon,visited,2019,landing
+perseverance,mars,visited,2021,landing

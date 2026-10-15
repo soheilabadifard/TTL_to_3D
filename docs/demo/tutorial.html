@@ -77,6 +77,16 @@ own legend row, and prints what it fetched. Queries repeat and mix with files; c
 from the command line. Answers over 100 MB (<code>--max-mb</code>) are refused with a hint to narrow the
 query. The example query is in the repository under <code>examples/</code>.</p>
 
+<h2>From a table</h2>
+<p>A property graph in CSV needs no conversion: <code>ttl3d missions.csv mission-links.csv --color-by type
+-o missions.html</code> reads a node table (an <code>id</code> column, with <code>name</code>,
+<code>type</code> and any other columns) and an edge table (<code>source</code>, <code>target</code>,
+<code>relation</code>); the other cells of an edge row, a year and a kind of visit in the
+<a href="missions.html">Space missions demo</a>, show on the card under the relation. Neo4j and Gephi
+exports work as they are, <code>--columns source=from_id</code> maps any other header, and in Python a
+pandas DataFrame is a table too. The two example files are in the repository under
+<code>examples/</code>.</p>
+
 <h2>From Python</h2>
 <p>The same pipeline is a function call, and the options are the command line's:</p>
 <pre><code>import rdflib, ttl3d
@@ -84,8 +94,8 @@ query. The example query is in the repository under <code>examples/</code>.</p>
 g = rdflib.Graph().parse("pizza.owl")
 ttl3d.write(("pizza", g), "pizza.html", color_by="type")   # a file
 ttl3d.show(("pizza", g))                                    # inline, as the last line of a notebook cell</code></pre>
-<p>Sources are file paths, <code>rdflib.Graph</code> objects, <code>(name, source)</code> pairs or a
-<code>{name: source}</code> mapping, in any mix. <a href="https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb">Open the example notebook in Colab</a>.</p>
+<p>Sources are file paths, <code>rdflib.Graph</code> objects, DataFrames, <code>(name, source)</code>
+pairs or a <code>{name: source}</code> mapping, in any mix. <a href="https://colab.research.google.com/github/soheilabadifard/TTL_to_3D/blob/main/examples/ttl3d.ipynb">Open the example notebook in Colab</a>.</p>
 
 <h2>Limits</h2>
 <ul>
