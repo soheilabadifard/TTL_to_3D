@@ -136,14 +136,16 @@ def test_cli_announces_a_big_stress_layout_on_stderr(tmp_path, capsys):
 
 SOLAR = ("examples/solar-system.ttl", "examples/solar-system-missions.ttl")
 TRIG = ("tests/fixtures/library.trig",)
+TABLES = ("tests/fixtures/people.csv", "tests/fixtures/knows.csv")
 
 
 FOCUS = ("--focus", ":Earth", "--hops", "2")
 
 
 @pytest.mark.parametrize(("view", "inputs", "extra"),
-                         [("3d", SOLAR, ()), ("2d", SOLAR, ()), ("3d", TRIG, ()), ("3d", SOLAR, FOCUS)],
-                         ids=["solar-3d", "solar-2d", "trig-3d", "solar-focus"])
+                         [("3d", SOLAR, ()), ("2d", SOLAR, ()), ("3d", TRIG, ()), ("3d", SOLAR, FOCUS),
+                          ("3d", TABLES, ())],
+                         ids=["solar-3d", "solar-2d", "trig-3d", "solar-focus", "tables-3d"])
 def test_cli_output_is_identical_across_processes(tmp_path, view, inputs, extra):
     pages = []
     for seed in ("1", "2"):
@@ -616,3 +618,67 @@ def test_a_query_file_that_is_not_utf8_text_is_a_one_line_error(tmp_path, endpoi
     err = capsys.readouterr().err
     assert err.count("\n") == 1 and str(rq) in err and "not UTF-8 text" in err
     assert endpoint.requests == []
+
+
+def test_tables_draw_a_property_graph_from_the_command_line(tmp_path, people, knows, capsys):
+    out = tmp_path / "t.html"
+    assert cli.main([str(people), str(knows), "-o", str(out)]) == 0
+    assert capsys.readouterr().out.startswith("4 nodes, 4 links")
+    page = out.read_text(encoding="utf-8")
+    assert "<title>people</title>" in page and '"statements": [' in page
+
+
+def test_standard_input_reads_a_table_under_format_csv(tmp_path, knows):
+    r = _run_with_stdin(["-", "--format", "csv"], knows.read_bytes(), tmp_path)
+    assert r.returncode == 0, r.stderr.decode()
+    assert b"4 nodes, 4 links" in r.stdout and (tmp_path / "stdin-3d.html").exists()
+
+
+def test_columns_and_base_reach_the_tables(tmp_path, capsys):
+    f = tmp_path / "e.csv"
+    f.write_text("from_id,to_id,kind\na,b,likes\n", encoding="utf-8")
+    out = tmp_path / "e.html"
+    assert cli.main([str(f), "--columns", "source=from_id, target=to_id", "--columns", "relation=kind",
+                     "--base", "http://example.org/g#", "-o", str(out)]) == 0
+    assert capsys.readouterr().out.startswith("2 nodes, 1 links")
+    page = out.read_text(encoding="utf-8")
+    assert '"id": "http://example.org/g#a"' in page and '"predicates": ["likes"]' in page
+
+
+@pytest.mark.parametrize(("args", "message"), [
+    (["--columns", "source"], "--columns wants ROLE=HEADER, got 'source'"),
+    (["--columns", "source=a,source=b"], "--columns names source twice"),
+    (["--columns", "srcc=a"], ("unknown column role 'srcc'; roles are id, label, type, description, "
+                               "source, target, relation")),
+    (["--base", "nope"], "base must be an absolute IRI ending in /, # or :, got 'nope'"),
+])
+def test_bad_table_options_are_refused_before_standard_input_is_read(tmp_path, args, message):
+    proc = subprocess.Popen([sys.executable, "-m", "ttl3d", "-", "--format", "csv", *args,
+                             "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO)
+    try:
+        code = proc.wait(timeout=30)
+        err = proc.stderr.read()
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        pytest.fail("the CLI read standard input before checking the table options")
+    finally:
+        proc.stdin.close()
+        proc.stdout.close()
+        proc.stderr.close()
+    assert code == 1 and err == f"ttl3d: error: {message}\n"
+
+
+@pytest.mark.parametrize(("content", "message"), [
+    (b"a,b\n1,2\n", (": no source and target columns and no id column (found: a, b); name them, "
+                     "or map them with --columns")),
+    (b"source,target\na,\n", ": line 2: an edge needs both a source and a target"),
+    (b"id,name\n1,A,B\n", ": line 2: 3 cells, but the header has 2"),
+    ("id\nCaf\xe9\n".encode("latin-1"), ": not UTF-8 text; save the table as UTF-8"),
+])
+def test_a_bad_table_is_a_one_line_error(tmp_path, capsys, content, message):
+    bad = tmp_path / "bad.csv"
+    bad.write_bytes(content)
+    assert cli.main([str(bad), "-o", str(tmp_path / "x.html")]) == 1
+    assert capsys.readouterr().err == f"ttl3d: error: {bad}{message}\n"         # the path as given

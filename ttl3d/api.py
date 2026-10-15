@@ -8,7 +8,7 @@ Options mirror the command line. Errors are raised, never printed.
 
     sources --> load.load --> Dataset --> [slice.select] --> graph.build --> data --> layout --> html
     (paths, Graphs, Datasets, Queries,                                                (stress: positions +
-     (name, item), {name: item})                                                      notice, force: nothing)
+     DataFrames, (name, item), {name: item})                                          notice, force: nothing)
                                      build_page <-- cli.main -- notice -> stderr, summary line, exit code
                                          |
                                          +-- to_html(...) -> str     +-- write(..., out) -> Path
@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import html as _html
 import os
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from rdflib.term import URIRef
 
-from . import graph, load
+from . import graph, load, table
 from . import layout as _layout
 from . import render as _render
 from . import slice as _slice
@@ -60,13 +60,15 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
                labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
                attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
                focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
+               columns: Mapping[str, str] | None = None, base: str | None = None,
                notice: Callable[[str], None] | None = None) -> Built:
     """Run every stage once. `notice` receives the fetch line of every sparql.Query source,
     the slice line and the stress-layout announcement, if any (the CLI prints them to stderr; the
     API stays silent). Option values are checked before any work.
     `focus`, `hops` and `schema` cut the data down before the model is built (see ttl3d.slice);
     `hops` is checked before any file is read, a focus that is not a node in the data raises
-    after loading."""
+    after loading. `columns` and `base` apply to table sources (see ttl3d.table) and are checked
+    before any file is read too."""
     if view not in _render.VIEWS:
         raise ValueError(f"view must be one of {_render.VIEWS}, got {view!r}")
     if layout not in _layout.LAYOUT_MODES:
@@ -76,7 +78,9 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
     if color_by not in graph.COLOR_KEYS:
         raise ValueError(f"color_by must be one of {graph.COLOR_KEYS}, got {color_by!r}")
     check_hops(hops)
-    ds = load.load(sources, fmt, notice=notice)
+    table.check_columns(columns)
+    table.check_base(base)
+    ds = load.load(sources, fmt, notice=notice, columns=columns, base=base)
     if not ds.sources:
         raise ValueError("at least one source is needed")
     extra = _terms(attribute_preds, ds)
@@ -110,11 +114,15 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
 def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
             labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
             attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
-            focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False) -> str:
-    """The page as HTML text. `sources`: a path, an rdflib.Graph, an rdflib.Dataset or a ttl3d.Query,
-    a (name, item) pair, or a list of those; a path is named by its stem, a Graph by its pair name or
-    "graph", a Dataset by its pair name or "dataset". A quad file or a Dataset adds one source per
-    named graph.
+            focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
+            columns: Mapping[str, str] | None = None, base: str | None = None) -> str:
+    """The page as HTML text. `sources`: a path, an rdflib.Graph, an rdflib.Dataset, a ttl3d.Query or
+    a DataFrame, a (name, item) pair, or a list of those; a path is named by its stem, a Graph by its
+    pair name or "graph", a Dataset by its pair name or "dataset", a DataFrame by its pair name or
+    "table". A quad file or a Dataset adds one source per named graph. A .csv or .tsv path and a
+    DataFrame are tables: an edge table (source and target columns) and/or a node table (an id
+    column); `columns={"source": "from_id"}` names columns whose headers are not known names, and
+    ids that are not IRIs are minted under `base` (default urn:x-ttl3d:, prefix csv).
     `title=None` means the first source's name; an empty string is an empty title (unlike
     `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")
@@ -123,7 +131,7 @@ def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file
     ValueError / TypeError."""
     return build_page(sources, title=title, color_by=color_by, layout=layout, labels=labels, view=view,
                       lang=lang, type_links=type_links, attribute_preds=attribute_preds, fmt=fmt,
-                      focus=focus, hops=hops, schema=schema).html
+                      focus=focus, hops=hops, schema=schema, columns=columns, base=base).html
 
 
 def write(sources: Sources, out: str | os.PathLike, **options: Any) -> Path:

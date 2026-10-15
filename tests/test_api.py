@@ -270,3 +270,29 @@ def test_the_fetch_notice_comes_before_the_slice_notice(endpoint):
     api.build_page(ttl3d.Query(endpoint.url + "/sparql", Q), focus=["ex:a"], hops=0, notice=seen.append)
     assert seen[0].startswith(f"fetched 2 triples from {endpoint.where} in ")
     assert seen[1] == "kept 1 of 2 nodes (focus ex:a, 0 hops)"
+
+
+def test_write_and_the_cli_give_the_same_bytes_for_tables(tmp_path, people, knows):
+    a, b = tmp_path / "a.html", tmp_path / "b.html"
+    ttl3d.write([people, knows], a, columns={"label": "name"})
+    assert cli.main([str(people), str(knows), "--columns", "label=name", "-o", str(b)]) == 0
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_table_options_are_checked_before_any_file_is_read(tmp_path):
+    missing = tmp_path / "missing.csv"
+    with pytest.raises(ValueError, match="^unknown column role"):
+        ttl3d.to_html(missing, columns={"ids": "x"})
+    with pytest.raises(ValueError, match="^base must be"):
+        ttl3d.to_html(missing, base="urn:x")
+
+
+def test_a_real_dataframe_is_a_table():
+    pd = pytest.importorskip("pandas")
+    nodes = pd.DataFrame({"id": ["a", "b"], "name": ["Alpha", None]})
+    edges = pd.DataFrame({"source": ["a"], "target": ["b"], "weight": [0.5]})
+    data = _page_data(ttl3d.to_html([("nodes", nodes), ("edges", edges)]))
+    assert sorted(n["label"] for n in data["nodes"]) == ["Alpha", "b"]
+    assert data["links"][0]["statements"][0]["props"] == {"weight": ["0.5"]}
+    indexed = _page_data(ttl3d.to_html([("nodes", nodes.set_index("id")), ("edges", edges)]))
+    assert indexed["nodes"] == data["nodes"]               # set_index("id") keeps the ids
