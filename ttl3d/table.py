@@ -191,7 +191,8 @@ def read_frame(frame, name: str) -> Table:
 
 
 def check_columns(columns: Mapping[str, str] | None) -> dict[str, str]:
-    """`columns` as {role: header in lower case}; ValueError for an unknown role or an empty header."""
+    """`columns` as {role: header as written, trimmed (matched in any case)}; ValueError for an unknown
+    role or an empty header."""
     if columns is None:
         return {}
     if not isinstance(columns, Mapping):
@@ -202,7 +203,7 @@ def check_columns(columns: Mapping[str, str] | None) -> dict[str, str]:
             raise ValueError(f"unknown column role {role!r}; roles are {', '.join(ROLES)}")
         if not isinstance(header, str) or not header.strip():
             raise ValueError(f"the column for {role} must be a non-empty header, got {header!r}")
-        out[role] = header.strip().lower()
+        out[role] = header.strip()
     return out
 
 
@@ -218,7 +219,7 @@ def check_base(base: str | None) -> str:
 
 def _find(columns: list[Column], role: str, mapped: Mapping[str, str], claimed: set[int]) -> int | None:
     if role in mapped:
-        return next((i for i, c in enumerate(columns) if c.header.lower() == mapped[role]), None)
+        return next((i for i, c in enumerate(columns) if c.header.lower() == mapped[role].lower()), None)
     for wanted in NAMES[role]:
         for i, c in enumerate(columns):
             if c.key == wanted and i not in claimed:
@@ -265,7 +266,7 @@ def classify(t: Table, columns: Mapping[str, str]) -> None:
 def check_mapped(columns: Mapping[str, str], tables: list[Table]) -> None:
     """Every header that `columns` names is in some table of the run."""
     for role, header in columns.items():
-        if not any(c.header.lower() == header for t in tables for c in t.columns):
+        if not any(c.header.lower() == header.lower() for t in tables for c in t.columns):
             raise ValueError(f"no table has the column {header!r} that {role}={header} names")
 
 

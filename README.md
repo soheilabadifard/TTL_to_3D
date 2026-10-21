@@ -262,9 +262,10 @@ nodes, and APOC's one-file export (nodes and relationships in one table) works t
 `Label` is the relation and its `Type` (Directed/Undirected) an edge property. Any other header is
 mapped by hand, for every table of the run: `--columns source=from_id,target=to_id`
 (`columns={"source": "from_id"}` in Python); a column you map is not also taken by another role's
-names. The delimiter of a `.csv` (comma, semicolon or tab) is read from the header line; the text must
-be UTF-8, and a quote left open is an error naming its line rather than a cell that swallows the rest
-of the file.
+names, and a mapping wins over what the header says of itself (`--columns id=key:IGNORE` reads the
+ids from `key:IGNORE`). The delimiter of a `.csv` (comma, semicolon or tab) is read from the header
+line; the text must be UTF-8, and a quote left open is an error naming its line rather than a cell that
+swallows the rest of the file.
 
 - **Ids.** `<urn:isbn:0441013597>`, or anything with `://`, is that IRI. `ex:Dune` is a CURIE when an
   RDF file of the same run binds `ex`, so a table can add edges between an ontology's nodes;

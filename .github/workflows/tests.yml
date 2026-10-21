@@ -30,6 +30,12 @@ jobs:
         run: |
           pip install "rdflib==7.0.0"
           python -m pytest -q tests/test_load.py tests/test_graph.py
+      - name: a real DataFrame (pandas is never a dependency, so only this leg installs it)
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        run: |
+          pip install pandas
+          python -c "import pandas"
+          python -m pytest -q tests/test_api.py tests/test_notebook.py
 
   browser:
     runs-on: ${{ matrix.os }}

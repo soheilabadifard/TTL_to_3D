@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ttl3d"
 dynamic = ["version"]
-description = "Turn any Turtle / RDF graph into a self-contained, offline 2D/3D HTML viewer"
+description = "Turn RDF graphs, SPARQL results and tables into a self-contained, offline 2D/3D HTML viewer"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Soheil Abadifard"}]
@@ -27,7 +27,10 @@ classifiers = [
 ]
 
 [project.urls]
+Homepage = "https://soheilabadifard.github.io/TTL_to_3D/"
 Repository = "https://github.com/soheilabadifard/TTL_to_3D"
+Changelog = "https://github.com/soheilabadifard/TTL_to_3D/blob/main/CHANGELOG.md"
+"Release notes" = "https://github.com/soheilabadifard/TTL_to_3D/releases"
 Issues = "https://github.com/soheilabadifard/TTL_to_3D/issues"
 
 [project.scripts]

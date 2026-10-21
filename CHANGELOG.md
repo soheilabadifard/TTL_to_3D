@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.9.1 (2026-10-21)
+
+The leftovers of the 0.9.0 tables release, and release notes where people look for them.
+
+- The `--columns` error names the header as you wrote it: `--columns id=Key2` reports `'Key2'`, not
+  `'key2'` (headers still match in any case).
+- A `--columns` mapping wins over what the header says of itself: `--columns id=key:IGNORE` reads the
+  ids from that column, as it already did; the README says so and a test pins it.
+- The notebook shows a table: a cell reads the Space missions CSV files into DataFrames
+  (`dtype=str`) and shows the page; its install line now asks for `ttl3d>=0.9.0`.
+- PyPI lists the changelog, the release notes and the demo site beside the repository, and its
+  one-line summary and `CITATION.cff`'s title name SPARQL results and tables as well as RDF.
+- Tests: a CI leg installs pandas, so the real-DataFrame test and the notebook's DataFrame cell run
+  there; two more loader tests for ids whose rows say nothing; the tests that prove an option is
+  checked before standard input is read write the CLI's output to files, not pipes.
+
 ## 0.9.0 (2026-10-15)
 
 Tables as sources: CSV, TSV and DataFrames. `ttl3d nodes.csv edges.csv` draws a property graph with no

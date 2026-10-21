@@ -35,28 +35,13 @@
     second, unconnected copy of those nodes appears silently; Neo4j's own importer refuses such files.
     `table.to_graphs` knows every minted id and its group, so the check is a set lookup at its end.
 
-- **Leftovers of the 0.9.0 tables release** (from its reviews, unranked):
-  - The Colab notebook shows no table: `examples/ttl3d.ipynb` has no DataFrame example and still pins
-    `ttl3d>=0.3.0`. Notebooks are where DataFrame input helps most. `tests/test_notebook.py` runs every
-    code cell offline in CI, where pandas is not installed, so a DataFrame cell needs a guard or the
-    test a skip for it.
-  - No CI leg installs pandas: fake frames cover the duck-typed path, but
-    `tests/test_api.py::test_a_real_dataframe_is_a_table` (pandas' `to_csv`, `set_index("id")`) has
-    only run locally. Add pandas to one test leg.
-  - `CITATION.cff`'s title still reads "a self-contained 3D and 2D HTML viewer for RDF graphs" while
-    its abstract and keywords mention tables; Zenodo reads it at the next release. The owner's call.
-  - Loader tests: an IRI id whose node row says nothing and that an RDF file has only as a link object
-    (still labelled, as a node already); bare ids spread over two tables (the `made[ti]` indexing in
-    `load.load`).
-  - A `--columns` mapping that points a role at a column with no key (`x:IGNORE`, an empty header) is
-    untested; ids and ends are still read from it.
-  - `test_bad_table_options_are_refused_before_standard_input_is_read` (and the older hop-count test it
-    copies) reads `proc.stderr` after `wait()`; `communicate()` with a timeout is sturdier.
-  - `table.check_columns` lower-cases the header, so `--columns id=Key2` reports `'key2'`: keep the
-    spelling as written for the message.
-
 ## Completed
 
+- The leftovers of the 0.9.0 tables release, shipped in 0.9.1 (branch `leftovers-0.9.1`): a DataFrame
+  cell in the notebook (pin `ttl3d>=0.9.0`), a CI leg with pandas, the `CITATION.cff` title, two loader
+  tests, `--columns` onto a `:IGNORE` column (the mapping wins), the stdin-order tests on files instead
+  of pipes (`communicate()` would close standard input at once and void the proof), and the header
+  spelling kept in the `--columns` error.
 - Tables as sources (CSV, TSV, DataFrames) with edge properties on the card, item 1 of the 2026-09-11
   input list: shipped in 0.9.0 (branch `csv`).
 - An IPv6 endpoint (`--endpoint http://[::1]:8890/sparql`) named the default output file `::1-3d.html`,
