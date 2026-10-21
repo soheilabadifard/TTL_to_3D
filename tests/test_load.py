@@ -610,6 +610,8 @@ def test_columns_need_a_table_and_a_table_that_has_the_header(library, people):
         load.load([library], columns={"id": "id"})
     with pytest.raises(ValueError, match="^no table has the column 'key2' that id=key2 names$"):
         load.load([people], columns={"id": "key2"})
+    with pytest.raises(ValueError, match="^no table has the column 'Key2' that id=Key2 names$"):
+        load.load([people], columns={"id": "Key2"})          # the header as written, not lower-cased
 
 
 def test_a_table_and_a_turtle_file_with_one_stem_get_two_keys(tmp_path, library):
@@ -627,6 +629,32 @@ def test_an_iri_id_whose_row_says_nothing_is_still_a_node(tmp_path, library):
     alice = URIRef("https://example.org/alice")
     assert set(ds.graphs["ids"]) == {(alice, URIRef("http://www.w3.org/2000/01/rdf-schema#label"),
                                       Literal("alice"))}       # Dune is a subject in library already
+
+
+def test_an_iri_id_that_an_rdf_file_has_only_as_a_link_object_is_still_labelled(tmp_path):
+    ttl, ids = tmp_path / "links.ttl", tmp_path / "ids.csv"
+    ttl.write_text("<https://example.org/a> <https://example.org/p> <https://example.org/b> .\n",
+                   encoding="utf-8")
+    ids.write_text("id\n<https://example.org/b>\n", encoding="utf-8")
+    b = URIRef("https://example.org/b")
+    assert set(load.load([ids, ttl]).graphs["ids"]) == {(b, RDFS.label, Literal("b"))}
+
+
+def test_bare_ids_in_two_tables_are_labelled_in_their_own_tables(tmp_path):
+    one, two = tmp_path / "one.csv", tmp_path / "two.csv"
+    one.write_text("id\n<https://example.org/a>\n", encoding="utf-8")
+    two.write_text("id\n<https://example.org/b>\n<https://example.org/a>\n", encoding="utf-8")
+    ds = load.load([one, two])
+    a, b = URIRef("https://example.org/a"), URIRef("https://example.org/b")
+    assert set(ds.graphs["one"]) == {(a, RDFS.label, Literal("a"))}
+    assert set(ds.graphs["two"]) == {(b, RDFS.label, Literal("b"))}
+
+
+def test_a_mapped_column_is_read_even_when_its_header_says_ignore(tmp_path):
+    f = tmp_path / "people.csv"
+    f.write_text("key:IGNORE,name\nada,Ada Lovelace\n", encoding="utf-8")
+    ds = load.load([f], columns={"id": "key:IGNORE"})     # the mapping wins over the header's :IGNORE
+    assert set(ds.graphs["people"]) == {(URIRef(TABLE_NS + "ada"), RDFS.label, Literal("Ada Lovelace"))}
 
 
 def test_the_table_prefix_steps_aside_when_an_input_binds_csv_elsewhere(tmp_path, people):

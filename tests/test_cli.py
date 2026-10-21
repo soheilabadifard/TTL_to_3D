@@ -343,23 +343,31 @@ def test_hops_needs_focus_and_bad_focus_or_hops_are_one_line_errors(tmp_path, li
     assert not out.exists()
 
 
+def _run_with_stdin_held_open(tmp_path, args, failure):
+    """Run the CLI with its standard input open and never fed; (exit code, stderr). A CLI that read
+    standard input before failing would block until the timeout. communicate() would close standard
+    input at once (it does when given no input), so stderr goes to a file instead."""
+    err = tmp_path / "stderr.txt"
+    with open(err, "wb") as e:
+        proc = subprocess.Popen([sys.executable, "-m", "ttl3d", *args, "-o", str(tmp_path / "x.html")],
+                                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=e, cwd=REPO,
+                                env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+        try:
+            code = proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            pytest.fail(failure)
+        finally:
+            proc.stdin.close()
+    return code, err.read_text(encoding="utf-8")
+
+
 def test_a_bad_hop_count_is_refused_before_standard_input_is_read(tmp_path):
     # the write end stays open and unfed: a CLI that read standard input before checking --hops would
     # block here until the timeout, so a fast exit with the hops error proves the order
-    proc = subprocess.Popen([sys.executable, "-m", "ttl3d", "-", "--focus", "ex:a", "--hops", "-1",
-                             "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO)
-    try:
-        code = proc.wait(timeout=30)
-        err = proc.stderr.read()
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-        pytest.fail("the CLI read standard input before checking --hops")
-    finally:
-        proc.stdin.close()
-        proc.stdout.close()
-        proc.stderr.close()
+    code, err = _run_with_stdin_held_open(tmp_path, ["-", "--focus", "ex:a", "--hops", "-1"],
+                                          "the CLI read standard input before checking --hops")
     assert code == 1 and err.startswith("ttl3d: error: hops must be a non-negative integer")
 
 
@@ -653,20 +661,8 @@ def test_columns_and_base_reach_the_tables(tmp_path, capsys):
     (["--base", "nope"], "base must be an absolute IRI ending in /, # or :, got 'nope'"),
 ])
 def test_bad_table_options_are_refused_before_standard_input_is_read(tmp_path, args, message):
-    proc = subprocess.Popen([sys.executable, "-m", "ttl3d", "-", "--format", "csv", *args,
-                             "-o", str(tmp_path / "x.html")], stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO)
-    try:
-        code = proc.wait(timeout=30)
-        err = proc.stderr.read()
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-        pytest.fail("the CLI read standard input before checking the table options")
-    finally:
-        proc.stdin.close()
-        proc.stdout.close()
-        proc.stderr.close()
+    code, err = _run_with_stdin_held_open(tmp_path, ["-", "--format", "csv", *args],
+                                          "the CLI read standard input before checking the table options")
     assert code == 1 and err == f"ttl3d: error: {message}\n"
 
 
