@@ -33,7 +33,7 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 
 ## MIT
 
-- 3d-force-graph 1.80.0 — Copyright (c) 2017 Vasco Asturiano
+- 3d-force-graph 1.80.1 — Copyright (c) 2017 Vasco Asturiano
 - @babel/runtime 7.29.7 — Copyright (c) 2014-present Sebastian McKenzie and other contributors
 - @tweenjs/tween.js 25.0.0 — Copyright (c) 2010-2012 Tween.js authors.
 - accessor-fn 1.5.3 — Copyright (c) 2017 Vasco Asturiano
@@ -44,7 +44,7 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 - d3-octree 1.1.0 — Copyright (c) 2017 Vasco Asturiano
 - data-bind-mapper 1.0.3 — Copyright (c) 2024 Vasco Asturiano
 - float-tooltip 1.7.5 — Copyright (c) 2022 Vasco Asturiano
-- force-graph 1.51.5 — Copyright (c) 2018 Vasco Asturiano
+- force-graph 1.52.0 — Copyright (c) 2018 Vasco Asturiano
 - index-array-by 1.4.2 — Copyright (c) 2018 Vasco Asturiano
 - kapsule 1.16.3 — Copyright (c) 2017 Vasco Asturiano
 - lodash-es 4.18.1 — Copyright OpenJS Foundation and other contributors <https://openjsf.org/>

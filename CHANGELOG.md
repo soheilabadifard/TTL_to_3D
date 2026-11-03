@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Vendored bundle: 3d-force-graph 1.80.1 and force-graph 1.52.0 (Dependabot #32). Pages look and
+  behave as before.
+- CI: PyPI uploads use `pypa/gh-action-pypi-publish` 1.14.3, which fixes GHSA-5xjx-3w67-w9x9
+  (Dependabot #33).
+
 ## 0.9.1 (2026-10-21)
 
 The leftovers of the 0.9.0 tables release, and release notes where people look for them.
