@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.2 (2026-11-02)
+
+Dependency updates: the vendored bundle and the PyPI upload action.
+
 - Vendored bundle: 3d-force-graph 1.80.1 and force-graph 1.52.0 (Dependabot #32). Pages look and
   behave as before.
 - CI: PyPI uploads use `pypa/gh-action-pypi-publish` 1.14.3, which fixes GHSA-5xjx-3w67-w9x9
