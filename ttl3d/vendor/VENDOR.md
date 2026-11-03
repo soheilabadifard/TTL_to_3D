@@ -1,8 +1,8 @@
 # Vendored libraries
 
 `fg-bundle.min.js` is a single esbuild IIFE bundle exposing
-`window.ForceGraph3D` (3d-force-graph 1.80.0, MIT), `window.ForceGraph`
-(force-graph 1.51.5, MIT: the 2D canvas renderer), `window.SpriteText`
+`window.ForceGraph3D` (3d-force-graph 1.80.1, MIT), `window.ForceGraph`
+(force-graph 1.52.0, MIT: the 2D canvas renderer), `window.SpriteText`
 (three-spritetext 1.10.0, MIT) and `window.THREE` (three.js 0.186.1, MIT),
 built over ONE shared copy of three.js so the sprite labels and the 3D scene
 use the same version. It is inlined into every generated page, so the page is
@@ -60,8 +60,8 @@ pins are exact and locked, and that `LICENSES.md` names every runtime package
 of the lockfile, so a rebuild that drops one fails the suite instead of
 breaking pages silently.
 
-Pinned upstream versions in the shipped bundle: 3d-force-graph 1.80.0,
-force-graph 1.51.5, three-spritetext 1.10.0, three.js 0.186.1 (the bundle's
+Pinned upstream versions in the shipped bundle: 3d-force-graph 1.80.1,
+force-graph 1.52.0, three-spritetext 1.10.0, three.js 0.186.1 (the bundle's
 tail carries the three.js license banner); esbuild as pinned in
 `package.json`. The bundle also inlines their dependencies (d3 modules,
 kapsule, three-render-objects and others, all under permissive licences);
