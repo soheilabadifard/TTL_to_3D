@@ -447,6 +447,20 @@ def test_the_type_legend_keeps_clashing_types_apart(tmp_path):
     assert nodes["a"]["group"] == ":Book" and nodes["b"]["group"] == "owl:Class"
 
 
+def test_only_an_iri_type_is_a_type(tmp_path):
+    # a blank-node type (an OWL class expression) has no name of its own: rdflib's id for it changes on
+    # every run, and it reached the card and, coloured by type, the legend. A literal type is a property.
+    ttl = tmp_path / "types.ttl"
+    ttl.write_text(
+        "@prefix ex: <http://example.org/library#> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "ex:a a [ a owl:Restriction ; owl:onProperty ex:p ; owl:someValuesFrom ex:B ] ; ex:p ex:b .\n"
+        'ex:c a ex:Person, "Person" ; ex:p ex:a .\n', encoding="utf-8")
+    data = build(ttl, color_by="type")
+    assert node(data, "a")["types"] == [] and node(data, "a")["group"] == "?"
+    assert node(data, "c")["types"] == ["Person"] and node(data, "c")["props"] == {"type": ["Person"]}
+    assert data["groups"] == ["?", "Person"]
+
+
 def test_a_predicate_the_page_never_shows_causes_no_prefix(tmp_path):
     ttl = tmp_path / "dc.ttl"            # rdf:type sits on the card as a type, rdfs:label as the title
     ttl.write_text("@prefix ex: <http://example.org/d#> .\n@prefix dcterms: <http://purl.org/dc/terms/> .\n"

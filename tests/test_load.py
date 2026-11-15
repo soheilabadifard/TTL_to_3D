@@ -452,6 +452,68 @@ def test_json_ld_named_and_anonymous_graphs_load_like_trig(tmp_path):
     assert owners == {"a": "g", "b": "g", "c": "g"}
 
 
+J = "http://example.org/j#"
+J_NODE = {"@id": J + "a", J + "p": {"@id": J + "b"}}
+J_ELSEWHERE = "http://example.org/ctx.jsonld"
+
+
+@pytest.mark.parametrize(("doc", "named"), [
+    ({"@context": J_ELSEWHERE, **J_NODE}, J_ELSEWHERE),                         # a URL: a request
+    ({"@context": "../ctx.json", **J_NODE}, "../ctx.json"),                    # a path: a file read
+    ({"@context": [{"ex": J}, J_ELSEWHERE], **J_NODE}, J_ELSEWHERE),            # one of several
+    ({"@context": [{"ex": J}, [[J_ELSEWHERE]]], **J_NODE}, J_ELSEWHERE),        # rdflib unnests lists
+    ({"@context": {"@import": J_ELSEWHERE}, **J_NODE}, J_ELSEWHERE),            # JSON-LD 1.1's @import
+    ({"@graph": [{"@context": J_ELSEWHERE, **J_NODE}]}, J_ELSEWHERE),           # a node's own context
+    ({"@context": {"p": {"@id": J + "p", "@context": J_ELSEWHERE}}, **J_NODE}, J_ELSEWHERE),   # a term's
+    ([{"@context": J_ELSEWHERE, **J_NODE}], J_ELSEWHERE),                       # inside an array
+    ({"@context": "\x1b[2J", **J_NODE}, "\x1b[2J"),       # shown as text, never sent to the terminal
+])
+@pytest.mark.parametrize("fmt", ["json-ld", "application/ld+json"])
+def test_a_json_ld_context_that_names_another_document_is_refused_before_rdflib_reads_it(
+        tmp_path, monkeypatch, doc, named, fmt):
+    # rdflib's JSON-LD parser fetches a context given as a URL and reads one given as a path, so a
+    # file from someone else would choose a request this machine sends or a file it reads
+    doc_file = tmp_path / "doc.jsonld"
+    doc_file.write_text(json.dumps(doc), encoding="utf-8")
+    monkeypatch.setattr(load.RdfDataset, "parse", lambda *a, **k: pytest.fail("rdflib read the document"))
+    expected = (f"cannot parse as {fmt}: its @context refers to another document ({named!r}), which "
+                "ttl3d will not fetch; inline the context or convert the file to another RDF format first")
+    with pytest.raises(load.LoadError) as e:
+        load.load_files([doc_file], fmt)
+    assert str(e.value) == f"{doc_file}: {expected}"
+    with pytest.raises(load.LoadError) as e:
+        load.parse_data(json.dumps(doc).encode(), fmt, "stdin")
+    assert str(e.value) == f"stdin: {expected}"
+    assert "\x1b" not in str(e.value)
+
+
+def test_a_refused_json_ld_context_is_the_error_even_after_the_turtle_retry(tmp_path):
+    # by extension: the JSON-LD parser is guessed, Turtle is tried next, the guessed parser's error stays
+    doc = tmp_path / "doc.jsonld"
+    doc.write_text(json.dumps({"@context": J_ELSEWHERE, **J_NODE}), encoding="utf-8")
+    with pytest.raises(load.LoadError, match=r"doc\.jsonld: cannot parse as json-ld: its @context refers"):
+        load.load_files([doc])
+
+
+def test_json_ld_contexts_written_into_the_file_load_as_before(tmp_path):
+    doc = tmp_path / "inline.jsonld"
+    doc.write_text(json.dumps({
+        "@context": [None, {"ex": J}, {"knows": {"@id": "ex:p", "@type": "@id", "@context": {"x": J}}}],
+        "@graph": [{"@id": "ex:a", "knows": "ex:b"},
+                   {"@context": {"other": "http://example.org/other#"}, "@id": "ex:b", "other:q": "text"}],
+    }), encoding="utf-8")
+    ds = load.load_files([doc])
+    assert set(ds.merged) == {(URIRef(J + "a"), URIRef(J + "p"), URIRef(J + "b")),
+                              (URIRef(J + "b"), URIRef("http://example.org/other#q"), Literal("text"))}
+
+
+def test_json_ld_that_is_not_json_keeps_its_one_line_error():
+    with pytest.raises(load.LoadError) as e:
+        load.parse_data(b"{not json", "json-ld", "stdin")
+    assert str(e.value) == ("stdin: cannot parse as json-ld: Expecting property name enclosed in double "
+                            "quotes: line 1 column 2 (char 1)")
+
+
 def test_key_order_is_the_same_across_hash_seeds_and_the_loader_raises_no_deprecation_warning(library_trig):
     # the filter is armed after the imports: numpy/scipy import-time deprecations must not fail
     # this test, while a deprecated rdflib call inside load() still would (rdflib 7.6 deprecates

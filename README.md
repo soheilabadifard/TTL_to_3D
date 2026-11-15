@@ -74,7 +74,7 @@ The same pipeline is a function call (`pip install "ttl3d>=0.4.0"`; tables and D
 objects (a CONSTRUCT against a SPARQL endpoint), DataFrames (see "From tables"), `(name, source)`
 pairs or a `{name: source}` mapping, in any mix, several in a list (not a set: their order names the
 page and orders the legend); the options are the command line's (`focus`, `hops`, `schema`, `columns`
-and `base` included).
+and `base` included; `focus` and `attribute_preds` take one term or a list of them).
 
 ```python
 import rdflib, ttl3d
@@ -125,6 +125,16 @@ prefixed IRI (`ex:planets`, or the full IRI when no prefix covers it; the IRI
 itself is the row's hover text and appears on the cards), while the file's
 default graph keeps the file's name. The same graph IRI in several files is one
 source.
+
+A JSON-LD input has to carry its own context. One whose `@context` names another document (a URL
+such as `https://schema.org`, a file path, or an `@import`) is refused: rdflib would fetch that URL
+or open that path by itself, so the file would choose a request your machine sends or a file it
+reads. Write the context into the file, or convert the file first, which fetches the context once
+and by your own command (`rdfpipe` comes with rdflib):
+
+```bash
+rdfpipe -i json-ld -o nquads data.jsonld | ttl3d - --format nquads -o data.html
+```
 
 ## What becomes a node, what becomes a link
 

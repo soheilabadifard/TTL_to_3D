@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+Fixes from a review of every module (correctness, security, completeness).
+
+- **A JSON-LD input must carry its own context.** A `@context` that names another document (a URL, a
+  file path, or JSON-LD 1.1's `@import`, at any depth) is refused with a one-line error before the
+  file is parsed: rdflib fetched such a URL and opened such a path by itself, so a file from someone
+  else chose a request your machine sent or a file it read. SPARQL answers were already protected
+  (JSON-LD is refused there); files, `--format json-ld` and standard input now are too. A file with
+  a remote context (`"@context": "https://schema.org"`) used to load and no longer does: write the
+  context into the file, or convert it first (`rdfpipe -i json-ld -o nquads data.jsonld | ttl3d -
+  --format nquads`). The README says so.
+- A node's types are its IRI types only. A blank-node type (an OWL class expression) showed on the
+  card as rdflib's internal id, which changes on every run, and under `--color-by type` it became
+  the node's legend group, so two runs gave two different pages; a literal type showed twice (as a
+  type and as a property) and now shows as the property only.
+- A source reached through two source predicates (`prov:wasDerivedFrom` and `dcterms:source` to
+  the same IRI) is listed once on the card, not twice.
+- `focus="ex:Dune"` and `attribute_preds="ex:wrote"` (one term, not in a list) mean that term in
+  `ttl3d.to_html`, `write` and `show`; the string was read character by character and failed with
+  `unknown prefix in 'e'`. A single `URIRef` works the same way.
+- Tests: three review files (`tests/test_review_*.py`) pin the fixes above and add coverage for
+  documented behaviour no test exercised (`--version`, `--focus csv:New%20York`, relative IRIs on
+  standard input, `write(..., focus=...)`, the summary line's `labels:` field, and more).
+
 ## 0.9.2 (2026-11-02)
 
 Dependency updates: the vendored bundle and the PyPI upload action.
