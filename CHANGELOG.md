@@ -24,6 +24,8 @@ Fixes from a review of every module (correctness, security, completeness).
 - Tests: three review files (`tests/test_review_*.py`) pin the fixes above and add coverage for
   documented behaviour no test exercised (`--version`, `--focus csv:New%20York`, relative IRIs on
   standard input, `write(..., focus=...)`, the summary line's `labels:` field, and more).
+- Vendored bundle: three.js 0.187.0 (Dependabot #35). Pages look and behave as before (the demo's 3D
+  view renders pixel for pixel the same); a page is about 37 KB larger.
 
 ## 0.9.2 (2026-11-02)
 
