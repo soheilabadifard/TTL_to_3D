@@ -51,7 +51,7 @@ whenever the bundle is rebuilt. The licence texts follow the list.
 - ngraph.merge 1.0.0 — Copyright (c) 2013-2019 Andrei Kashcha
 - polished 4.3.1 — Copyright (c) 2016-Present Brian Hough and Maximilian Stoiber
 - preact 10.29.8 — Copyright (c) 2015-present Jason Miller
-- three 0.186.1 — Copyright © 2010-2026 three.js authors
+- three 0.187.0 — Copyright © 2010-2026 three.js authors
 - three-forcegraph 1.43.4 — Copyright (c) 2017 Vasco Asturiano
 - three-render-objects 1.42.0 — Copyright (c) 2018 Vasco Asturiano
 - three-spritetext 1.10.0 — Copyright (c) 2018 Vasco Asturiano

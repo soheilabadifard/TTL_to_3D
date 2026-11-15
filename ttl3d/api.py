@@ -49,17 +49,29 @@ def check_hops(hops: object) -> None:
         raise ValueError(f"hops must be a non-negative integer, got {hops!r}")
 
 
-def _terms(terms: Iterable[str | URIRef], ds) -> set:
+# one term or several; a URIRef is a str, so it is one term too
+Terms = str | Iterable[str | URIRef]
+
+
+def _listed(terms: Terms | None) -> list:
+    """The terms as a list. A bare string is one term, as a bare path is one source: iterating it would
+    resolve its characters ("unknown prefix in 'e'")."""
+    if not terms:
+        return []
+    return [terms] if isinstance(terms, str) else list(terms)
+
+
+def _terms(terms: Terms, ds) -> set:
     """URIRefs as they are (URIRef is a str subclass); plain strings resolve like the CLI's."""
-    terms = list(terms)
+    terms = _listed(terms)
     return {t for t in terms if isinstance(t, URIRef)} | graph.resolve_terms(
         [t for t in terms if not isinstance(t, URIRef)], ds)
 
 
 def build_page(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
                labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
-               attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
-               focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
+               attribute_preds: Terms = (), fmt: str | None = None,
+               focus: Terms | None = None, hops: int = 1, schema: bool = False,
                columns: Mapping[str, str] | None = None, base: str | None = None,
                notice: Callable[[str], None] | None = None) -> Built:
     """Run every stage once. `notice` receives the fetch line of every sparql.Query source,
@@ -85,7 +97,7 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
         raise ValueError("at least one source is needed")
     extra = _terms(attribute_preds, ds)
     # focus terms keep their order for the notice; each resolves like an attribute predicate
-    seeds = [t if isinstance(t, URIRef) else graph.resolve_terms([t], ds).pop() for t in (focus or ())]
+    seeds = [t if isinstance(t, URIRef) else graph.resolve_terms([t], ds).pop() for t in _listed(focus)]
     cut = None
     if seeds or schema:
         cut = _slice.select(ds, focus=seeds, hops=hops, schema=schema, type_links=type_links,
@@ -113,8 +125,8 @@ def build_page(sources: Sources, *, title: str | None = None, color_by: str = "f
 
 def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file", layout: str = "auto",
             labels: str = "auto", view: str = "3d", lang: str | None = "en", type_links: bool = False,
-            attribute_preds: Iterable[str | URIRef] = (), fmt: str | None = None,
-            focus: Iterable[str | URIRef] | None = None, hops: int = 1, schema: bool = False,
+            attribute_preds: Terms = (), fmt: str | None = None,
+            focus: Terms | None = None, hops: int = 1, schema: bool = False,
             columns: Mapping[str, str] | None = None, base: str | None = None) -> str:
     """The page as HTML text. `sources`: a path, an rdflib.Graph, an rdflib.Dataset, a ttl3d.Query or
     a DataFrame, a (name, item) pair, or a list of those; a path is named by its stem, a Graph by its
@@ -126,9 +138,9 @@ def to_html(sources: Sources, *, title: str | None = None, color_by: str = "file
     `title=None` means the first source's name; an empty string is an empty title (unlike
     `--title ""` on the command line, which the CLI maps to `None`).
     `attribute_preds` takes the command line's strings ("prefix:local", an IRI, "<urn:...>")
-    or rdflib terms. `focus`, `hops` and `schema` slice the data first (a neighbourhood, the
-    schema, or the neighbourhood inside the schema). Raises LoadError / FileNotFoundError /
-    ValueError / TypeError."""
+    or rdflib terms, one or a list of them, as `focus` does. `focus`, `hops` and `schema` slice the
+    data first (a neighbourhood, the schema, or the neighbourhood inside the schema). Raises
+    LoadError / FileNotFoundError / ValueError / TypeError."""
     return build_page(sources, title=title, color_by=color_by, layout=layout, labels=labels, view=view,
                       lang=lang, type_links=type_links, attribute_preds=attribute_preds, fmt=fmt,
                       focus=focus, hops=hops, schema=schema, columns=columns, base=base).html

@@ -30,6 +30,7 @@ source of its own, keyed by its prefixed IRI.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import pyexpat
@@ -142,6 +143,34 @@ def _expat_first(source, fmt: str) -> None:
         pyexpat.ParserCreate("utf-8").Parse(source, True)
 
 
+JSONLD_FORMATS = frozenset({"json-ld", "application/ld+json"})
+
+
+def _own_contexts_only(source, fmt: str) -> None:
+    """Refuse a JSON-LD document (a file's path, or data) whose @context, at any depth, names another
+    document: a string, a string in a list (rdflib unnests lists of lists), or JSON-LD 1.1's @import.
+    rdflib's parser fetches such a reference as a URL or reads it as a path by itself, so a file from
+    someone else would choose a request this machine sends or a file it reads; the SPARQL side refuses
+    JSON-LD answers for the same reason. The scan is by key, whatever holds the key, so it refuses
+    more than rdflib would fetch for (a scoped context no node uses, a JSON literal with an
+    "@context" of its own), never less. Text that is not JSON fails here, with rdflib's message."""
+    if fmt not in JSONLD_FORMATS:
+        return
+    if isinstance(source, os.PathLike):
+        with open(source, "rb") as fh:
+            source = fh.read()
+    todo = [(json.loads(source), False)]    # a stack, not recursion: the nesting is the document's choice
+    while todo:
+        item, names = todo.pop()            # names: a string here names a context document
+        if isinstance(item, str) and names:
+            raise ValueError(f"its @context refers to another document ({item!r}), which ttl3d will not "
+                             "fetch; inline the context or convert the file to another RDF format first")
+        if isinstance(item, list):
+            todo.extend((x, names) for x in reversed(item))
+        elif isinstance(item, dict):
+            todo.extend((v, k in ("@context", "@import")) for k, v in reversed(item.items()))
+
+
 def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
     """Parse one file. Without an explicit format the extension decides; if that
     parser rejects the file, try Turtle once (Turtle saved as .owl is common)."""
@@ -149,6 +178,7 @@ def _parse(f: Path, fmt: str | None = None) -> RdfDataset:
 
     def parse(rds, fm):
         _expat_first(f, fm)
+        _own_contexts_only(f, fm)
         rds.parse(f, format=fm)
 
     try:
@@ -193,6 +223,7 @@ def parse_data(data: bytes, fmt: str | None = None, name: str = "data",
     directory, as rdflib does for data without a base; declare @base in the data to be explicit."""
     def parse(rds, fm):
         _expat_first(data, fm)
+        _own_contexts_only(data, fm)
         rds.parse(data=data, format=fm, publicID=base)
 
     return _parsed(name, fmt or "turtle", parse)

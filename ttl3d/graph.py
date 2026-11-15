@@ -224,8 +224,10 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
 
     nodes = []
     for n in sorted(node_ids, key=str):
-        types = sorted(type_name.get(t) or local(t, prefixes)
-                       for t in g.objects(n, RDF.type) if t != OWL.NamedIndividual)
+        # an IRI type only: a blank-node type (a class expression) has no name but rdflib's id for it,
+        # new on every run, and a literal type is already among the properties
+        types = sorted(type_name[t] for t in g.objects(n, RDF.type)
+                       if isinstance(t, URIRef) and t != OWL.NamedIndividual)
         label_vals = [str(o) for p in LABEL_PREDS for o in _literals(g, n, p, lang)]
         definition = _first(g, n, DEFINITION_PREDS, lang)
         def_pred = next((p for p in DEFINITION_PREDS if _literals(g, n, p, lang)), None)
@@ -243,7 +245,8 @@ def build(ds: Dataset, color_by: str = "file", lang: str | None = None,
         sources = [{"label": label, "url": src_url.get(s)}
                    for label, s in sorted(
                        (labels.get(s) or _first(g, s, LABEL_PREDS, lang) or local(s, prefixes), s)
-                       for p in SOURCE_PREDS for s in g.objects(n, p) if isinstance(s, URIRef))]
+                       # a set: one row per source, however many source predicates name it
+                       for s in {o for p in SOURCE_PREDS for o in g.objects(n, p) if isinstance(o, URIRef)})]
         ns = namespace_of(n, prefixes)
         nodes.append({
             "id": str(n), "label": labels[n], "types": types,
