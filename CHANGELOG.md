@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-Fixes from a review of every module (correctness, security, completeness).
+## 0.9.3 (2026-11-15)
+
+Fixes from a review of every module (correctness, security, completeness), and three.js 0.187.0 in
+the vendored bundle.
 
 - **A JSON-LD input must carry its own context.** A `@context` that names another document (a URL, a
   file path, or JSON-LD 1.1's `@import`, at any depth) is refused with a one-line error before the
